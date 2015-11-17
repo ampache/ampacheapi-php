@@ -30,7 +30,7 @@ echo "Videos: " . $stats['videos'] . "<br />\n";
 
 ### Get all artists
 ```php
-$total = $stats['songs'];
+$total = $stats['artists'];
 $step = 500; // Request per 500
 $start = 0;
 
