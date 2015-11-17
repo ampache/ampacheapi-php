@@ -12,7 +12,7 @@ $ampache = new AmpacheApi(array(
    'api_secure' => 'false' // Set to true to use https
 ));
 
-if ($remote_handle->state() != 'CONNECTED') {
+if ($ampache->state() != 'CONNECTED') {
   echo "Ampache API client failed to connected.\n";
   exit;
 }
