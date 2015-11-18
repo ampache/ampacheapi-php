@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
+namespace AmpacheApi;
 
 class AmpacheApi
 {
@@ -50,8 +51,9 @@ class AmpacheApi
     protected $XML_grabtags   = array();
     protected $XML_skiptags   = array('root');
     protected $XML_parenttags = array('artist','album','song','tag','video','playlist','result',
-                        'auth','version','update','add','clean','songs',
-                        'artists','albums','tags','videos','api','playlists','catalogs');
+                            'auth','version','update','add','clean','songs','artists','albums',
+                            'tags','videos','api','playlists','catalogs', 'user', 'users',
+                            'shouts', 'timeline');
 
     // Library static version information
     protected static $LIB_version = '350001';
