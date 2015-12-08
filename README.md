@@ -1,6 +1,9 @@
 # ampacheapi-php
 Ampache API PHP Library.
 
+## License
+Ampache API PHP Library is free software; you can redistribute it and/or modify it under the terms of the GNU Affero General Public License v3 (AGPLv3) as published by the Free Software Foundation.
+
 ## Get Started
 
 ### Initialize
