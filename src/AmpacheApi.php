@@ -225,7 +225,7 @@ class AmpacheApi
     public function info()
     {
         if ($this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::info API in non-ready state, unable to return info');
+            throw new \Exception('AmpacheApi::info API in non-ready state, unable to return info');
         }
 
         return $this->handshake;
@@ -242,14 +242,14 @@ class AmpacheApi
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
         if ($this->state() != 'READY' AND $this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
+            throw new \Exception('AmpacheApi::send_command API in non-ready state, unable to send');
         }
         $command = trim($command);
         if (!$command) {
-            throw new Exception('AmpacheApi::send_command no command specified');
+            throw new \Exception('AmpacheApi::send_command no command specified');
         }
         if (!$this->validate_command($command)) {
-            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
+            throw new \Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
         }
 
         $url = $this->api_url . '?action=' . urlencode($command);
@@ -307,7 +307,7 @@ class AmpacheApi
 
         if (!xml_parse($this->XML_parser, $response)) {
             $errorcode =  xml_get_error_code($this->XML_parser);
-            throw new Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
+            throw new \Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
         }
 
         xml_parser_free($this->XML_parser);
