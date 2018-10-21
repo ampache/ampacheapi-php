@@ -119,7 +119,9 @@ class AmpacheApi
         // Set up the handshake
         $results    = array();
         $timestamp  = time();
-        $passphrase = hash('sha256', $timestamp . $this->password);
+
+        $key = hash('sha256', $this->password);
+        $passphrase = hash('sha256', $timestamp . $key);
 
         $options = array(
             'timestamp' => $timestamp,
@@ -186,7 +188,7 @@ class AmpacheApi
         $this->api_url = $protocol . $this->server . '/server/xml.server.php';
 
         // See if we have enough to authenticate, if so change the state
-        if ($this->username AND $this->password AND $this->server) {
+        if (!empty($this->username) && !empty($this->server)) {
             $this->set_state('ready');
         }
 
@@ -377,7 +379,9 @@ class AmpacheApi
             if (!$this->XML_subTag) {
                 $this->XML_results[$this->XML_position][$this->XML_currentTag]['self'] = $attributes;
             } else {
-                $this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag]['self'] = $attributes;
+                if(isset($this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag]) && is_array($this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag])) {
+                    $this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag]['self'] = $attributes;
+                }
             }
         }
     } // start_element
