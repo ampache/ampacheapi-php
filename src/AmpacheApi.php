@@ -19,19 +19,379 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+declare(strict_types=0);
+
 namespace AmpacheApi;
+
+use Exception;
 
 class AmpacheApi
 {
+    private const API3_METHOD_LIST = [
+        'advanced_search',
+        'album',
+        'albums',
+        'album_songs',
+        'artist',
+        'artist_albums',
+        'artists',
+        'artist_songs',
+        'democratic',
+        'followers',
+        'following',
+        'friends_timeline',
+        'genre',
+        'genre_albums',
+        'genre_artists',
+        'genres',
+        'genre_songs',
+        'handshake',
+        'last_shouts',
+        'localplay',
+        'ping',
+        'playlist',
+        'playlist_add_song',
+        'playlist_create',
+        'playlist_delete',
+        'playlist_remove_song',
+        'playlists',
+        'playlist_songs',
+        'rate',
+        'search_songs',
+        'song',
+        'songs',
+        'stats',
+        'tag',
+        'tag_albums',
+        'tag_artists',
+        'tags',
+        'tag_songs',
+        'timeline',
+        'toggle_follow',
+        'url_to_song',
+        'user',
+        'video',
+        'videos'
+    ];
+    private const API4_METHOD_LIST = [
+        'advanced_search',
+        'album',
+        'albums',
+        'album_songs',
+        'artist',
+        'artist_albums',
+        'artists',
+        'artist_songs',
+        'catalog',
+        'catalog_action',
+        'catalog_file',
+        'catalogs',
+        'democratic',
+        'download',
+        'flag',
+        'followers',
+        'following',
+        'friends_timeline',
+        'genre',
+        'genre_albums',
+        'genre_artists',
+        'genres',
+        'genre_songs',
+        'get_art',
+        'get_indexes',
+        'get_similar',
+        'goodbye',
+        'handshake',
+        'last_shouts',
+        'license',
+        'licenses',
+        'license_songs',
+        'localplay',
+        'ping',
+        'playlist',
+        'playlist_add_song',
+        'playlist_create',
+        'playlist_delete',
+        'playlist_edit',
+        'playlist_generate',
+        'playlist_remove_song',
+        'playlists',
+        'playlist_songs',
+        'podcast',
+        'podcast_create',
+        'podcast_delete',
+        'podcast_edit',
+        'podcast_episode',
+        'podcast_episode_delete',
+        'podcast_episodes',
+        'podcasts',
+        'rate',
+        'record_play',
+        'scrobble',
+        'search_songs',
+        'share',
+        'share_create',
+        'share_delete',
+        'share_edit',
+        'shares',
+        'song',
+        'songs',
+        'stats',
+        'stream',
+        'tag',
+        'tag_albums',
+        'tag_artists',
+        'tags',
+        'tag_songs',
+        'timeline',
+        'toggle_follow',
+        'update_art',
+        'update_artist_info',
+        'update_from_tags',
+        'update_podcast',
+        'url_to_song',
+        'user',
+        'user_create',
+        'user_delete',
+        'users',
+        'user_update',
+        'video',
+        'videos'
+    ];
+    private const API5_METHOD_LIST = [
+        'advanced_search',
+        'album',
+        'albums',
+        'album_songs',
+        'artist',
+        'artist_albums',
+        'artists',
+        'artist_songs',
+        'bookmark_create',
+        'bookmark_delete',
+        'bookmark_edit',
+        'bookmarks',
+        'catalog',
+        'catalog_action',
+        'catalog_file',
+        'catalogs',
+        'deleted_podcast_episodes',
+        'deleted_songs',
+        'deleted_videos',
+        'democratic',
+        'download',
+        'flag',
+        'followers',
+        'following',
+        'friends_timeline',
+        'genre',
+        'genre_albums',
+        'genre_artists',
+        'genres',
+        'genre_songs',
+        'get_art',
+        'get_bookmark',
+        'get_indexes',
+        'get_similar',
+        'goodbye',
+        'handshake',
+        'label',
+        'label_artists',
+        'labels',
+        'last_shouts',
+        'license',
+        'licenses',
+        'license_songs',
+        'live_stream',
+        'live_streams',
+        'localplay',
+        'localplay_songs',
+        'ping',
+        'playlist',
+        'playlist_add_song',
+        'playlist_create',
+        'playlist_delete',
+        'playlist_edit',
+        'playlist_generate',
+        'playlist_remove_song',
+        'playlists',
+        'playlist_songs',
+        'podcast',
+        'podcast_create',
+        'podcast_delete',
+        'podcast_edit',
+        'podcast_episode',
+        'podcast_episode_delete',
+        'podcast_episodes',
+        'podcasts',
+        'preference_create',
+        'preference_delete',
+        'preference_edit',
+        'rate',
+        'record_play',
+        'scrobble',
+        'search_songs',
+        'share',
+        'share_create',
+        'share_delete',
+        'share_edit',
+        'shares',
+        'song',
+        'song_delete',
+        'songs',
+        'stats',
+        'stream',
+        'system_preference',
+        'system_preferences',
+        'system_update',
+        'tag',
+        'tag_albums',
+        'tag_artists',
+        'tags',
+        'tag_songs',
+        'timeline',
+        'toggle_follow',
+        'update_art',
+        'update_artist_info',
+        'update_from_tags',
+        'update_podcast',
+        'url_to_song',
+        'user',
+        'user_create',
+        'user_delete',
+        'user_edit',
+        'user_preference',
+        'user_preferences',
+        'users',
+        'user_update',
+        'video',
+        'videos'
+    ];
+    private const API6_METHOD_LIST = [
+        'advanced_search',
+        'album',
+        'albums',
+        'album_songs',
+        'artist',
+        'artist_albums',
+        'artists',
+        'artist_songs',
+        'bookmark_create',
+        'bookmark_delete',
+        'bookmark_edit',
+        'bookmarks',
+        'browse',
+        'catalog',
+        'catalog_action',
+        'catalog_add',
+        'catalog_delete',
+        'catalog_file',
+        'catalogs',
+        'deleted_podcast_episodes',
+        'deleted_songs',
+        'deleted_videos',
+        'democratic',
+        'download',
+        'flag',
+        'followers',
+        'following',
+        'friends_timeline',
+        'genre',
+        'genre_albums',
+        'genre_artists',
+        'genres',
+        'genre_songs',
+        'getart',
+        'get_bookmark',
+        'get_indexes',
+        'get_similar',
+        'goodbye',
+        'handshake',
+        'label',
+        'label_artists',
+        'labels',
+        'last_shouts',
+        'license',
+        'licenses',
+        'license_songs',
+        'list',
+        'live_stream',
+        'live_stream_create',
+        'live_stream_delete',
+        'live_stream_edit',
+        'live_streams',
+        'localplay',
+        'localplay_songs',
+        'ping',
+        'playlist',
+        'playlist_add_song',
+        'playlist_create',
+        'playlist_delete',
+        'playlist_edit',
+        'playlist_generate',
+        'playlist_remove_song',
+        'playlists',
+        'playlist_songs',
+        'podcast',
+        'podcast_create',
+        'podcast_delete',
+        'podcast_edit',
+        'podcast_episode',
+        'podcast_episode_delete',
+        'podcast_episodes',
+        'podcasts',
+        'preference_create',
+        'preference_delete',
+        'preference_edit',
+        'rate',
+        'record_play',
+        'register',
+        'scrobble',
+        'search_songs',
+        'share',
+        'share_create',
+        'share_delete',
+        'share_edit',
+        'shares',
+        'song',
+        'song_delete',
+        'songs',
+        'stats',
+        'stream',
+        'system_preference',
+        'system_preferences',
+        'system_update',
+        'timeline',
+        'toggle_follow',
+        'update_art',
+        'update_artist_info',
+        'update_from_tags',
+        'update_podcast',
+        'url_to_song',
+        'user',
+        'user_create',
+        'user_delete',
+        'user_edit',
+        'user_preference',
+        'user_preferences',
+        'users',
+        'user_update',
+        'video',
+        'videos'
+    ];
+
     // General Settings
     private $server;
     private $username;
     private $password;
     private $api_secure;
+    private $api_version = 3;
 
     // Handshake variables
     private $handshake;
     private $handshake_time; // Used to figure out how stale our data is
+    private $handshake_version = '390001';
 
     // Response variables
     private $api_session;
@@ -55,35 +415,31 @@ class AmpacheApi
     );
 
     protected $XML_parenttags = array(
-        'artist',
-        'album',
-        'song',
-        'tag',
-        'video',
-        'playlist',
-        'result',
-        'auth',
-        'version',
-        'update',
         'add',
-        'clean',
-        'songs',
-        'artists',
+        'album',
         'albums',
-        'tags',
-        'videos',
         'api',
-        'playlists',
+        'artist',
+        'artists',
+        'auth',
         'catalogs',
+        'clean',
+        'playlist',
+        'playlists',
+        'result',
+        'shouts',
+        'song',
+        'songs',
+        'tag',
+        'tags',
+        'timeline',
+        'update',
         'user',
         'users',
-        'shouts',
-        'timeline'
+        'version',
+        'video',
+        'videos'
     );
-
-    // Library static version information
-    protected static $LIB_version = '350001';
-    private static $API_version   = '';
 
     private $_debug_callback = null;
     private $_debug_output   = false;
@@ -138,7 +494,7 @@ class AmpacheApi
      *
      * This attempts to connect to the Ampache instance.
      */
-    public function connect()
+    public function connect(): bool
     {
         $this->_debug('CONNECT', "Using $this->username / $this->password");
 
@@ -152,7 +508,7 @@ class AmpacheApi
         $options = array(
             'timestamp' => $timestamp,
             'auth' => $passphrase,
-            'version' => self::$LIB_version,
+            'version' => $this->handshake_version,
             'user' => $this->username
         );
 
@@ -184,7 +540,7 @@ class AmpacheApi
      * object. It doesn't really do anything fancy, but it's a separate function
      * so it can be called both from the constructor and directly.
      */
-    public function configure($config = array())
+    public function configure($config = array()): bool
     {
         $this->_debug('CONFIGURE', 'Checking passed config options');
 
@@ -194,20 +550,37 @@ class AmpacheApi
             return false;
         }
 
-        // FIXME: Is the scrubbing of these variables actually sane?  I'm pretty
-        // sure password at least shouldn't be messed with like that.
+        // FIXME: Is the scrubbing of these variables actually sane?  I'm pretty sure password at least shouldn't be messed with like that.
         if (isset($config['username'])) {
             $this->username = htmlentities($config['username'], ENT_QUOTES, 'UTF-8');
         }
         if (isset($config['password'])) {
             $this->password = htmlentities($config['password'], ENT_QUOTES, 'UTF-8');
         }
+        if (isset($config['api_version'])) {
+            $this->api_version = (int)$config['api_version'];
+            switch ($this->api_version) {
+                case 3:
+                    $this->handshake_version = '390001';
+                    break;
+                case 4:
+                    $this->handshake_version = '443000';
+                    break;
+                case 5:
+                    $this->handshake_version = '5.5.6';
+                    break;
+                case 6:
+                    $this->handshake_version = '6.0.0';
+            }
+        }
 
         if (isset($config['api_secure'])) {
             // This should be a boolean response
-            $this->api_secure = $config['api_secure'] ? true : false;
+            $this->api_secure = (bool)$config['api_secure'];
         }
-        $protocol = $this->api_secure ? 'https://' : 'http://';
+        $protocol = $this->api_secure
+            ? 'https://'
+            : 'http://';
 
         if (isset($config['server'])) {
             // Replace any http:// in the URL with ''
@@ -257,7 +630,7 @@ class AmpacheApi
     public function info()
     {
         if ($this->state() != 'CONNECTED') {
-            throw new \Exception('AmpacheApi::info API in non-ready state, unable to return info');
+            throw new Exception('AmpacheApi::info API in non-ready state, unable to return info');
         }
 
         return $this->handshake;
@@ -274,14 +647,14 @@ class AmpacheApi
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
         if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
-            throw new \Exception('AmpacheApi::send_command API in non-ready state, unable to send');
+            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
         }
         $command = trim($command);
         if (!$command) {
-            throw new \Exception('AmpacheApi::send_command no command specified');
+            throw new Exception('AmpacheApi::send_command no command specified');
         }
         if (!$this->validate_command($command)) {
-            throw new \Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
+            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
         }
 
         $url = $this->api_url . '?action=' . urlencode($command);
@@ -317,10 +690,20 @@ class AmpacheApi
      * commands for the current version of Ampache. If no version is known yet
      * it should return FALSE for everything except ping and handshake.
      */
-    public function validate_command($command)
+    public function validate_command($command): bool
     {
-        // FIXME: actually do something
-        return true;
+        switch ($this->api_version) {
+            case 3:
+                return in_array($command, self::API3_METHOD_LIST);
+            case 4:
+                return in_array($command, self::API4_METHOD_LIST);
+            case 5:
+                return in_array($command, self::API5_METHOD_LIST);
+            case 6:
+                return in_array($command, self::API6_METHOD_LIST);
+        }
+
+        return false;
     }
 
     /**
@@ -340,13 +723,11 @@ class AmpacheApi
 
         if (!xml_parse($this->XML_parser, $response)) {
             $errorcode =  xml_get_error_code($this->XML_parser);
-            throw new \Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
+            throw new Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
         }
 
         xml_parser_free($this->XML_parser);
         $this->_debug('PARSE RESPONSE', json_encode($this->XML_results));
-
-        return true;
     }
 
     /**
@@ -379,7 +760,7 @@ class AmpacheApi
      * XML_cdata
      * This is called for the content of the XML tag
      */
-    public function XML_cdata($parser, $cdata)
+    public function XML_cdata($parser, $cdata): bool
     {
         $cdata = trim($cdata);
 
@@ -396,7 +777,7 @@ class AmpacheApi
         return true;
     } // XML_cdata
 
-    public function XML_start_element($parser, $tag, $attributes)
+    public function XML_start_element($parser, $tag, $attributes): bool
     {
         // Skip it!
         if (in_array($tag, $this->XML_skiptags)) {
