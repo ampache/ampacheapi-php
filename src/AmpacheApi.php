@@ -499,26 +499,24 @@ class AmpacheApi
         $this->_debug('CONNECT', "Using $this->username / $this->password");
 
         // Set up the handshake
-        $results   = array();
-        $timestamp = time();
-
-        $key        = hash('sha256', $this->password);
-        $passphrase = hash('sha256', $timestamp . $key);
+        $results    = array();
+        $time       = time();
+        $key        = hash('sha256', 'mypassword');
+        $passphrase = hash('sha256', $time . $key);
 
         $options = array(
-            'timestamp' => $timestamp,
+            'timestamp' => $time,
             'auth' => $passphrase,
             'version' => $this->handshake_version,
             'user' => $this->username
         );
 
         $data = $this->send_command('handshake', $options);
-
         foreach ($data as $value) {
             $results = array_merge($results, $value);
         }
 
-        if (!$results['auth']) {
+        if (!array_key_exists('auth', $results) || !$results['auth']) {
             $this->set_state('error');
 
             return false;
