@@ -146,7 +146,7 @@ class AmpacheApi
         $results   = array();
         $timestamp = time();
 
-        $key        = hash('sha256', $this->password);
+        $key        = hash('sha256', $this->password); // this password is already hashed
         $passphrase = hash('sha256', $timestamp . $key);
 
         $options = array(
