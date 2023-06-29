@@ -550,12 +550,11 @@ class AmpacheApi
             return false;
         }
 
-        // FIXME: Is the scrubbing of these variables actually sane?  I'm pretty sure password at least shouldn't be messed with like that.
         if (isset($config['username'])) {
-            $this->username = htmlentities($config['username'], ENT_QUOTES, 'UTF-8');
+            $this->username = $config['username'];
         }
         if (isset($config['password'])) {
-            $this->password = htmlentities($config['password'], ENT_QUOTES, 'UTF-8');
+            $this->password = $config['password'];
         }
         if (isset($config['api_version'])) {
             $this->api_version = (int)$config['api_version'];
