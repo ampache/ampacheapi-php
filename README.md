@@ -13,6 +13,7 @@ $ampache = new AmpacheApi(array(
    'username' => 'user1', // Username
    'password' => 'test', // Password
    'api_secure' => 'false' // Set to true to use https
+   'api_version' => 3 // Set API response version. 3, 4, 5, 6 (default: 3)
 ));
 
 if ($ampache->state() != 'CONNECTED') {

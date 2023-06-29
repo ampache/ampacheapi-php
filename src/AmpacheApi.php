@@ -558,19 +558,22 @@ class AmpacheApi
         }
         if (isset($config['api_version'])) {
             $this->api_version = (int)$config['api_version'];
-            switch ($this->api_version) {
-                case 3:
-                    $this->handshake_version = '390001';
-                    break;
-                case 4:
-                    $this->handshake_version = '443000';
-                    break;
-                case 5:
-                    $this->handshake_version = '5.5.6';
-                    break;
-                case 6:
-                    $this->handshake_version = '6.0.0';
-            }
+        }
+
+        // set the correct handshake version or fallback to 3 for invalid versions
+        switch ($this->api_version) {
+            case 4:
+                $this->handshake_version = '443000';
+                break;
+            case 5:
+                $this->handshake_version = '5.5.6';
+                break;
+            case 6:
+                $this->handshake_version = '6.0.0';
+                break;
+            case 3:
+            default:
+                $this->handshake_version = '390001';
         }
 
         if (isset($config['api_secure'])) {
