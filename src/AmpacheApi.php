@@ -47,13 +47,39 @@ class AmpacheApi
     private $XML_subTag;
     private $XML_parser;
     private $XML_results;
-    private $XML_position     = 0;
-    protected $XML_grabtags   = array();
-    protected $XML_skiptags   = array('root');
-    protected $XML_parenttags = array('artist','album','song','tag','video','playlist','result',
-                            'auth','version','update','add','clean','songs','artists','albums',
-                            'tags','videos','api','playlists','catalogs', 'user', 'users',
-                            'shouts', 'timeline');
+    private $XML_position = 0;
+
+    protected $XML_grabtags = array();
+    protected $XML_skiptags = array(
+        'root'
+    );
+
+    protected $XML_parenttags = array(
+        'artist',
+        'album',
+        'song',
+        'tag',
+        'video',
+        'playlist',
+        'result',
+        'auth',
+        'version',
+        'update',
+        'add',
+        'clean',
+        'songs',
+        'artists',
+        'albums',
+        'tags',
+        'videos',
+        'api',
+        'playlists',
+        'catalogs',
+        'user',
+        'users',
+        'shouts',
+        'timeline'
+    );
 
     // Library static version information
     protected static $LIB_version = '350001';
@@ -117,10 +143,10 @@ class AmpacheApi
         $this->_debug('CONNECT', "Using $this->username / $this->password");
 
         // Set up the handshake
-        $results    = array();
-        $timestamp  = time();
+        $results   = array();
+        $timestamp = time();
 
-        $key = hash('sha256', $this->password);
+        $key        = hash('sha256', $this->password);
         $passphrase = hash('sha256', $timestamp . $key);
 
         $options = array(
@@ -138,6 +164,7 @@ class AmpacheApi
 
         if (!$results['auth']) {
             $this->set_state('error');
+
             return false;
         }
         $this->api_auth = $results['auth'];
@@ -146,6 +173,8 @@ class AmpacheApi
         // not get better with age
         $this->handshake_time = time();
         $this->handshake      = $results;
+
+        return true;
     }
 
     /**
@@ -161,6 +190,7 @@ class AmpacheApi
 
         if (!is_array($config)) {
             trigger_error('AmpacheApi::configure received a non-array value');
+
             return false;
         }
 
@@ -243,7 +273,7 @@ class AmpacheApi
     {
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
-        if ($this->state() != 'READY' AND $this->state() != 'CONNECTED') {
+        if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
             throw new \Exception('AmpacheApi::send_command API in non-ready state, unable to send');
         }
         $command = trim($command);
@@ -276,6 +306,7 @@ class AmpacheApi
         $data               = file_get_contents($url);
         $this->raw_response = $data;
         $this->parse_response($data);
+
         return $this->get_response();
     }
 
@@ -314,6 +345,7 @@ class AmpacheApi
 
         xml_parser_free($this->XML_parser);
         $this->_debug('PARSE RESPONSE', json_encode($this->XML_results));
+
         return true;
     }
 
@@ -337,17 +369,17 @@ class AmpacheApi
     public function XML_create_parser()
     {
         $this->XML_parser = xml_parser_create();
-        xml_parser_set_option($this->XML_parser,XML_OPTION_CASE_FOLDING,false);
-        xml_set_object($this->XML_parser,$this);
-        xml_set_element_handler($this->XML_parser,'XML_start_element','XML_end_element');
-        xml_set_character_data_handler($this->XML_parser,'XML_cdata');
+        xml_parser_set_option($this->XML_parser, XML_OPTION_CASE_FOLDING, false);
+        xml_set_object($this->XML_parser, $this);
+        xml_set_element_handler($this->XML_parser, 'XML_start_element', 'XML_end_element');
+        xml_set_character_data_handler($this->XML_parser, 'XML_cdata');
     } // XML_create_parser
 
     /**
      * XML_cdata
      * This is called for the content of the XML tag
      */
-    public function XML_cdata($parser,$cdata)
+    public function XML_cdata($parser, $cdata)
     {
         $cdata = trim($cdata);
 
@@ -360,16 +392,18 @@ class AmpacheApi
         } else {
             $this->XML_results[$this->XML_position][$this->XML_currentTag] = $cdata;
         }
+
+        return true;
     } // XML_cdata
 
-    public function XML_start_element($parser,$tag,$attributes)
+    public function XML_start_element($parser, $tag, $attributes)
     {
         // Skip it!
-        if (in_array($tag,$this->XML_skiptags)) {
+        if (in_array($tag, $this->XML_skiptags)) {
             return false;
         }
 
-        if (!in_array($tag,$this->XML_parenttags) OR $this->XML_currentTag) {
+        if (!in_array($tag, $this->XML_parenttags) || $this->XML_currentTag) {
             $this->XML_subTag = $tag;
         } else {
             $this->XML_currentTag = $tag;
@@ -384,9 +418,11 @@ class AmpacheApi
                 }
             }
         }
+
+        return true;
     } // start_element
 
-    public function XML_end_element($parser,$tag)
+    public function XML_end_element($parser, $tag)
     {
         if ($tag != $this->XML_currentTag) {
             $this->XML_subTag = false;
