@@ -1,6 +1,9 @@
 <?php
-/* vim:set softtabstop=4 shiftwidth=4 expandtab: */
+
+declare(strict_types=0);
+
 /**
+ * vim:set softtabstop=4 shiftwidth=4 expandtab:
  *
  * LICENSE: GNU Affero General Public License, version 3 (AGPLv3)
  * Copyright 2001 - 2015 Ampache.org
@@ -20,14 +23,14 @@
  *
  */
 
-declare(strict_types=0);
-
 namespace AmpacheApi;
 
 use Exception;
 
 class AmpacheApi
 {
+    private const LIB_VERSION      = '350001';
+    private const API_VERSION      = '6.1.0';
     private const API3_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -277,6 +280,7 @@ class AmpacheApi
         'artist_albums',
         'artists',
         'artist_songs',
+        'bookmark',
         'bookmark_create',
         'bookmark_delete',
         'bookmark_edit',
@@ -287,6 +291,7 @@ class AmpacheApi
         'catalog_add',
         'catalog_delete',
         'catalog_file',
+        'catalog_folder',
         'catalogs',
         'deleted_podcast_episodes',
         'deleted_songs',
@@ -302,7 +307,7 @@ class AmpacheApi
         'genre_artists',
         'genres',
         'genre_songs',
-        'getart',
+        'get_art',
         'get_bookmark',
         'get_indexes',
         'get_similar',
@@ -323,6 +328,7 @@ class AmpacheApi
         'live_streams',
         'localplay',
         'localplay_songs',
+        'lost_password',
         'ping',
         'playlist',
         'playlist_add_song',
@@ -386,16 +392,15 @@ class AmpacheApi
     private $username;
     private $password;
     private $api_secure;
-    private $api_version = 3;
 
     // Handshake variables
     private $handshake;
     private $handshake_time; // Used to figure out how stale our data is
-    private $handshake_version = '390001';
 
     // Response variables
     private $api_session;
     private $raw_response;
+    private int $server_version = 6; // the version of API responses the client expects
 
     // Constructed variables
     private $api_url;
@@ -485,7 +490,7 @@ class AmpacheApi
         }
 
         if (!is_null($this->_debug_callback)) {
-            call_user_func($this->_debug_callback, 'AmpacheApi', "$source :: $message", $level);
+            call_user_func($this->_debug_callback, 'AmpacheApi', "$source :: $message", 5);
         }
     }
 
@@ -507,7 +512,7 @@ class AmpacheApi
         $options = array(
             'timestamp' => $time,
             'auth' => $passphrase,
-            'version' => $this->handshake_version,
+            'version' => $this->server_version,
             'user' => $this->username
         );
 
@@ -554,12 +559,15 @@ class AmpacheApi
         if (isset($config['password'])) {
             $this->password = $config['password'];
         }
-        if (isset($config['api_version'])) {
-            $this->api_version = (int)$config['api_version'];
+        if (isset($config['server_version'])) {
+            $this->server_version = (int)substr($config['api_version'], 0, 1);
         }
 
         // set the correct handshake version or fallback to 3 for invalid versions
-        switch ($this->api_version) {
+        switch ($this->server_version) {
+            case 3:
+                $this->handshake_version = '390001';
+                break;
             case 4:
                 $this->handshake_version = '443000';
                 break;
@@ -567,11 +575,8 @@ class AmpacheApi
                 $this->handshake_version = '5.5.6';
                 break;
             case 6:
-                $this->handshake_version = '6.0.0';
-                break;
-            case 3:
             default:
-                $this->handshake_version = '390001';
+                $this->handshake_version = self::API_VERSION;
         }
 
         if (isset($config['api_secure'])) {
