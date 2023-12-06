@@ -21,127 +21,8 @@
  */
 namespace AmpacheApi;
 
-use Exception;
-
 class AmpacheApi
 {
-    private const LIB_VERSION     = '350001';
-    private const API_VERSION     = '6.1.0';
-    private const AMPACHE_METHODS = array(
-        'advanced_search',
-        'album',
-        'albums',
-        'album_songs',
-        'artist',
-        'artist_albums',
-        'artists',
-        'artist_songs',
-        'bookmark',
-        'bookmark_create',
-        'bookmark_delete',
-        'bookmark_edit',
-        'bookmarks',
-        'browse',
-        'catalog',
-        'catalog_action',
-        'catalog_add',
-        'catalog_delete',
-        'catalog_file',
-        'catalog_folder',
-        'catalogs',
-        'deleted_podcast_episodes',
-        'deleted_songs',
-        'deleted_videos',
-        'democratic',
-        'download',
-        'flag',
-        'followers',
-        'following',
-        'friends_timeline',
-        'genre',
-        'genre_albums',
-        'genre_artists',
-        'genres',
-        'genre_songs',
-        'get_art',
-        'get_bookmark',
-        'get_indexes',
-        'get_similar',
-        'goodbye',
-        'handshake',
-        'label',
-        'label_artists',
-        'labels',
-        'last_shouts',
-        'license',
-        'licenses',
-        'license_songs',
-        'list',
-        'live_stream',
-        'live_stream_create',
-        'live_stream_delete',
-        'live_stream_edit',
-        'live_streams',
-        'localplay',
-        'localplay_songs',
-        'lost_password',
-        'ping',
-        'playlist',
-        'playlist_add_song',
-        'playlist_create',
-        'playlist_delete',
-        'playlist_edit',
-        'playlist_generate',
-        'playlist_remove_song',
-        'playlists',
-        'playlist_songs',
-        'podcast',
-        'podcast_create',
-        'podcast_delete',
-        'podcast_edit',
-        'podcast_episode',
-        'podcast_episode_delete',
-        'podcast_episodes',
-        'podcasts',
-        'preference_create',
-        'preference_delete',
-        'preference_edit',
-        'rate',
-        'record_play',
-        'register',
-        'scrobble',
-        'search_songs',
-        'share',
-        'share_create',
-        'share_delete',
-        'share_edit',
-        'shares',
-        'song',
-        'song_delete',
-        'songs',
-        'stats',
-        'stream',
-        'system_preference',
-        'system_preferences',
-        'system_update',
-        'timeline',
-        'toggle_follow',
-        'update_art',
-        'update_artist_info',
-        'update_from_tags',
-        'update_podcast',
-        'url_to_song',
-        'user',
-        'user_create',
-        'user_delete',
-        'user_edit',
-        'user_preference',
-        'user_preferences',
-        'users',
-        'user_update',
-        'video',
-        'videos'
-    );
     // General Settings
     private $server;
     private $username;
@@ -200,6 +81,10 @@ class AmpacheApi
         'timeline'
     );
 
+    // Library static version information
+    protected static $LIB_version = '350001';
+    private static $API_version   = '';
+
     private $_debug_callback = null;
     private $_debug_output   = false;
 
@@ -237,14 +122,14 @@ class AmpacheApi
      *
      * Make debugging all nice and pretty.
      */
-    private function _debug($source, $message)
+    private function _debug($source, $message, $level = 5)
     {
         if ($this->_debug_output) {
             echo "$source :: $message\n";
         }
 
         if (!is_null($this->_debug_callback)) {
-            call_user_func($this->_debug_callback, (self::class . '/' . self::LIB_VERSION), "$source :: $message", 5);
+            call_user_func($this->_debug_callback, 'AmpacheApi', "$source :: $message", $level);
         }
     }
 
@@ -258,21 +143,21 @@ class AmpacheApi
         $this->_debug('CONNECT', "Using $this->username / $this->password");
 
         // Set up the handshake
+        $results   = array();
         $timestamp = time();
 
-        $key        = $this->password; // this password is already hashed
+        $key        = hash('sha256', $this->password); // this password is already hashed
         $passphrase = hash('sha256', $timestamp . $key);
 
         $options = array(
             'timestamp' => $timestamp,
             'auth' => $passphrase,
-            'version' => self::API_VERSION,
+            'version' => self::$LIB_version,
             'user' => $this->username
         );
 
         $data = $this->send_command('handshake', $options);
 
-        $results = array();
         foreach ($data as $value) {
             $results = array_merge($results, $value);
         }
@@ -320,7 +205,7 @@ class AmpacheApi
 
         if (isset($config['api_secure'])) {
             // This should be a boolean response
-            $this->api_secure = (bool)$config['api_secure'];
+            $this->api_secure = $config['api_secure'] ? true : false;
         }
         $protocol = $this->api_secure ? 'https://' : 'http://';
 
@@ -372,7 +257,7 @@ class AmpacheApi
     public function info()
     {
         if ($this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::info API in non-ready state, unable to return info');
+            throw new \Exception('AmpacheApi::info API in non-ready state, unable to return info');
         }
 
         return $this->handshake;
@@ -389,14 +274,14 @@ class AmpacheApi
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
         if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
+            throw new \Exception('AmpacheApi::send_command API in non-ready state, unable to send');
         }
         $command = trim($command);
         if (!$command) {
-            throw new Exception('AmpacheApi::send_command no command specified');
+            throw new \Exception('AmpacheApi::send_command no command specified');
         }
         if (!$this->validate_command($command)) {
-            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
+            throw new \Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
         }
 
         $url = $this->api_url . '?action=' . urlencode($command);
@@ -434,7 +319,8 @@ class AmpacheApi
      */
     public function validate_command($command)
     {
-        return in_array($command, self::AMPACHE_METHODS);
+        // FIXME: actually do something
+        return true;
     }
 
     /**
@@ -454,7 +340,7 @@ class AmpacheApi
 
         if (!xml_parse($this->XML_parser, $response)) {
             $errorcode =  xml_get_error_code($this->XML_parser);
-            throw new Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
+            throw new \Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
         }
 
         xml_parser_free($this->XML_parser);
