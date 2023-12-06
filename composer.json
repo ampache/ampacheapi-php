@@ -7,10 +7,12 @@
     "license": "AGPL-3.0",
     "minimum-stability": "dev",
     "require": {
-        "php": ">=7.4.0"
+        "php": ">=7.4.0",
+        "ext-xml": "*",
+        "ext-json": "*"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "~3.10"
+        "friendsofphp/php-cs-fixer": "3.16.0"
     },
     "autoload": {
         "psr-4": {

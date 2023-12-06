@@ -396,6 +396,7 @@ class AmpacheApi
     // Handshake variables
     private $handshake;
     private $handshake_time; // Used to figure out how stale our data is
+    private int $handshake_version = 6;
 
     // Response variables
     private $api_session;
@@ -483,14 +484,14 @@ class AmpacheApi
      *
      * Make debugging all nice and pretty.
      */
-    private function _debug($source, $message, $level = 5)
+    private function _debug($source, $message)
     {
         if ($this->_debug_output) {
             echo "$source :: $message\n";
         }
 
         if (!is_null($this->_debug_callback)) {
-            call_user_func($this->_debug_callback,  (self::class . '/' . self::LIB_VERSION), "$source :: $message", 5);
+            call_user_func($this->_debug_callback, (self::class . '/' . self::LIB_VERSION), "$source :: $message", 5);
         }
     }
 
@@ -501,13 +502,13 @@ class AmpacheApi
      */
     public function connect(): bool
     {
-        $this->_debug('CONNECT', "Using $this->username / $this->password");
-
         // Set up the handshake
         $results    = array();
         $time       = time();
-        $key        = hash('sha256', 'mypassword');
+        $key        = $this->password;
         $passphrase = hash('sha256', $time . $key);
+
+        $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
 
         $options = array(
             'timestamp' => $time,
