@@ -396,7 +396,7 @@ class AmpacheApi
     // Handshake variables
     private $handshake;
     private $handshake_time; // Used to figure out how stale our data is
-    private int $handshake_version = 6;
+    private string $handshake_version;
 
     // Response variables
     private $api_session;
