@@ -7,7 +7,9 @@
     "license": "AGPL-3.0",
     "minimum-stability": "dev",
     "require": {
-        "php": ">=5.4.0"
+        "php": ">=7.4.0",
+        "ext-xml": "*",
+        "ext-json": "*"
     },
     "autoload": {
         "psr-4": {
