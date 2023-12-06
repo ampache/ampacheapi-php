@@ -29,7 +29,7 @@ use Exception;
 
 class AmpacheApi
 {
-    private const LIB_VERSION      = '350001';
+    private const LIB_VERSION      = '2.0.0-develop';
     private const API_VERSION      = '6.1.0';
     private const API3_METHOD_LIST = [
         'advanced_search',
@@ -490,7 +490,7 @@ class AmpacheApi
         }
 
         if (!is_null($this->_debug_callback)) {
-            call_user_func($this->_debug_callback, 'AmpacheApi', "$source :: $message", 5);
+            call_user_func($this->_debug_callback,  (self::class . '/' . self::LIB_VERSION), "$source :: $message", 5);
         }
     }
 
@@ -560,7 +560,7 @@ class AmpacheApi
             $this->password = $config['password'];
         }
         if (isset($config['server_version'])) {
-            $this->server_version = (int)substr($config['api_version'], 0, 1);
+            $this->server_version = (int)substr($config['server_version'], 0, 1);
         }
 
         // set the correct handshake version or fallback to 3 for invalid versions
@@ -697,7 +697,7 @@ class AmpacheApi
      */
     public function validate_command($command): bool
     {
-        switch ($this->api_version) {
+        switch ($this->server_version) {
             case 3:
                 return in_array($command, self::API3_METHOD_LIST);
             case 4:
