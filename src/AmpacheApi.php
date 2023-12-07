@@ -655,6 +655,7 @@ class AmpacheApi
                 if (!$result) {
                     return null;
                 }
+
                 return $result;
             case 'xml':
             default:
@@ -662,6 +663,7 @@ class AmpacheApi
                 if (!$result) {
                     return null;
                 }
+
                 return $result;
         }
     }
