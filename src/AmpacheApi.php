@@ -26,6 +26,7 @@ declare(strict_types=0);
 namespace AmpacheApi;
 
 use Exception;
+use SimpleXMLElement;
 
 class AmpacheApi
 {
@@ -394,61 +395,21 @@ class AmpacheApi
     private $api_secure;
 
     // Handshake variables
+    /** @var string|SimpleXMLElement|null */
     private $handshake;
-    private $handshake_time; // Used to figure out how stale our data is
+    private int $handshake_time; // Used to figure out how stale our data is
     private string $handshake_version;
 
     // Response variables
-    private $api_session;
-    private $raw_response;
     private int $server_version = 6; // the version of API responses the client expects
+    private string $api_format  = 'xml'; // the version of API responses the client expects
 
     // Constructed variables
-    private $api_url;
-    private $api_state = 'UNCONFIGURED';
-    private $api_auth;
-
-    // XML Parser variables
-    private $XML_currentTag;
-    private $XML_subTag;
-    private $XML_parser;
-    private $XML_results;
-    private $XML_position = 0;
-
-    protected $XML_grabtags = array();
-    protected $XML_skiptags = array(
-        'root'
-    );
-
-    protected $XML_parenttags = array(
-        'add',
-        'album',
-        'albums',
-        'api',
-        'artist',
-        'artists',
-        'auth',
-        'catalogs',
-        'clean',
-        'playlist',
-        'playlists',
-        'result',
-        'shouts',
-        'song',
-        'songs',
-        'tag',
-        'tags',
-        'timeline',
-        'update',
-        'user',
-        'users',
-        'version',
-        'video',
-        'videos'
-    );
-
     private $_debug_callback = null;
     private $_debug_output   = false;
+    private $api_auth;
+    private $api_state = 'UNCONFIGURED';
+    private $api_url;
 
     /**
      * Constructor
@@ -503,7 +464,6 @@ class AmpacheApi
     public function connect(): bool
     {
         // Set up the handshake
-        $results    = array();
         $time       = time();
         $key        = $this->password;
         $passphrase = hash('sha256', $time . $key);
@@ -517,20 +477,15 @@ class AmpacheApi
             'user' => $this->username
         );
 
-        $data = $this->send_command('handshake', $options);
-        foreach ($data as $value) {
-            $results = array_merge($results, $value);
-        }
-
-        if (!array_key_exists('auth', $results) || !$results['auth']) {
+        $results = $this->send_command('handshake', $options);
+        if (!$results || empty($results->auth)) {
             $this->set_state('error');
 
             return false;
         }
-        $this->api_auth = $results['auth'];
+        $this->api_auth = $results->auth;
         $this->set_state('connected');
-        // Define when we pulled this, it is not wine, it does
-        // not get better with age
+        // Define when we pulled this, it is not wine, it does not get better with age
         $this->handshake_time = time();
         $this->handshake      = $results;
 
@@ -546,7 +501,7 @@ class AmpacheApi
      */
     public function configure($config = array()): bool
     {
-        $this->_debug('CONFIGURE', 'Checking passed config options');
+        //$this->_debug('CONFIGURE', 'Checking passed config options');
 
         if (!is_array($config)) {
             trigger_error('AmpacheApi::configure received a non-array value');
@@ -562,6 +517,9 @@ class AmpacheApi
         }
         if (isset($config['server_version'])) {
             $this->server_version = (int)substr($config['server_version'], 0, 1);
+        }
+        if (isset($config['api_format']) && in_array($config['api_format'], array('xml', 'json'))) {
+            $this->api_format = $config['api_format'];
         }
 
         // set the correct handshake version or fallback to 3 for invalid versions
@@ -594,7 +552,7 @@ class AmpacheApi
             $this->server     = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
         }
 
-        $this->api_url = $protocol . $this->server . '/server/xml.server.php';
+        $this->api_url = $protocol . $this->server . '/server/' . $this->api_format . '.server.php';
 
         // See if we have enough to authenticate, if so change the state
         if (!empty($this->username) && !empty($this->server)) {
@@ -632,6 +590,8 @@ class AmpacheApi
      *
      * Returns the information gathered by the handshake.
      * Not raw so we can format it if we want?
+     * @return string|SimpleXMLElement|null
+     * @throws Exception
      */
     public function info()
     {
@@ -647,8 +607,10 @@ class AmpacheApi
      *
      * This sends an API command with options to the currently connected
      * host.
+     * @return string|SimpleXMLElement|null
+     * @throws Exception
      */
-    public function send_command($command, $options = array())
+    public function send_command(string $command, ?array $options = array())
     {
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
@@ -682,11 +644,26 @@ class AmpacheApi
 
         $this->_debug('COMMAND URL', $url);
 
-        $data               = file_get_contents($url);
-        $this->raw_response = $data;
-        $this->parse_response($data);
+        $data = file_get_contents($url);
+        if (!$data) {
+            return null;
+        }
 
-        return $this->get_response();
+        switch ($this->api_format) {
+            case 'json':
+                $result = json_encode($data);
+                if (!$result) {
+                    return null;
+                }
+                return $result;
+            case 'xml':
+            default:
+                $result = simplexml_load_string($data);
+                if (!$result) {
+                    return null;
+                }
+                return $result;
+        }
     }
 
     /**
@@ -711,111 +688,4 @@ class AmpacheApi
 
         return false;
     }
-
-    /**
-     * parse_response
-     *
-     * This takes an XML document and dumps it into $this->results. Before
-     * it does that it will clean up anything that was there before, so I hope
-     * you didn't want any of that.
-     */
-    public function parse_response($response)
-    {
-        // Reset the results
-        $this->XML_results  = array();
-        $this->XML_position = 0;
-
-        $this->XML_create_parser();
-
-        if (!xml_parse($this->XML_parser, $response)) {
-            $errorcode =  xml_get_error_code($this->XML_parser);
-            throw new Exception('AmpacheApi::parse_response was unable to parse XML document. Error ' . $errorcode . ' line ' . xml_get_current_line_number($this->XML_parser) . ': ' . xml_error_string($errorcode));
-        }
-
-        xml_parser_free($this->XML_parser);
-        $this->_debug('PARSE RESPONSE', json_encode($this->XML_results));
-    }
-
-    /**
-     * get_response
-     *
-     * This returns the last data we parsed.
-     */
-    public function get_response()
-    {
-        return $this->XML_results;
-    }
-
-
-    ////////////////////////// XML PARSER FUNCTIONS ////////////////////////////
-
-    /**
-     * XML_create_parser
-     * This creates the xml parser and sets the options
-     */
-    public function XML_create_parser()
-    {
-        $this->XML_parser = xml_parser_create();
-        xml_parser_set_option($this->XML_parser, XML_OPTION_CASE_FOLDING, false);
-        xml_set_object($this->XML_parser, $this);
-        xml_set_element_handler($this->XML_parser, 'XML_start_element', 'XML_end_element');
-        xml_set_character_data_handler($this->XML_parser, 'XML_cdata');
-    } // XML_create_parser
-
-    /**
-     * XML_cdata
-     * This is called for the content of the XML tag
-     */
-    public function XML_cdata($parser, $cdata): bool
-    {
-        $cdata = trim($cdata);
-
-        if (!$this->XML_currentTag || !$cdata) {
-            return false;
-        }
-
-        if ($this->XML_subTag) {
-            $this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag] = $cdata;
-        } else {
-            $this->XML_results[$this->XML_position][$this->XML_currentTag] = $cdata;
-        }
-
-        return true;
-    } // XML_cdata
-
-    public function XML_start_element($parser, $tag, $attributes): bool
-    {
-        // Skip it!
-        if (in_array($tag, $this->XML_skiptags)) {
-            return false;
-        }
-
-        if (!in_array($tag, $this->XML_parenttags) || $this->XML_currentTag) {
-            $this->XML_subTag = $tag;
-        } else {
-            $this->XML_currentTag = $tag;
-        }
-
-        if (count($attributes)) {
-            if (!$this->XML_subTag) {
-                $this->XML_results[$this->XML_position][$this->XML_currentTag]['self'] = $attributes;
-            } else {
-                if(isset($this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag]) && is_array($this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag])) {
-                    $this->XML_results[$this->XML_position][$this->XML_currentTag][$this->XML_subTag]['self'] = $attributes;
-                }
-            }
-        }
-
-        return true;
-    } // start_element
-
-    public function XML_end_element($parser, $tag)
-    {
-        if ($tag != $this->XML_currentTag) {
-            $this->XML_subTag = false;
-        } else {
-            $this->XML_currentTag = false;
-            $this->XML_position++;
-        }
-    } // end_element
 }
