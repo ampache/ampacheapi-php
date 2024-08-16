@@ -465,7 +465,7 @@ class AmpacheApi
     {
         // Set up the handshake
         $time       = time();
-        $key        = $this->password;
+        $key        = hash('sha256', $this->password); // this password is already hashed
         $passphrase = hash('sha256', $time . $key);
 
         $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
@@ -651,7 +651,7 @@ class AmpacheApi
 
         switch ($this->api_format) {
             case 'json':
-                $result = json_encode($data);
+                $result = json_decode($data);
                 if (!$result) {
                     return null;
                 }
