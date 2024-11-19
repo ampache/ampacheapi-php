@@ -13,11 +13,24 @@
         "ext-simplexml": "*"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "3.16.0"
+        "friendsofphp/php-cs-fixer": "^3.49",
+        "phpstan/phpstan": "^1.10"
     },
     "autoload": {
         "psr-4": {
             "AmpacheApi\\": "src/"
         }
+    },
+    "scripts": {
+        "stan": "vendor/bin/phpstan analyse",
+        "stan-baseline": "vendor/bin/phpstan --generate-baseline",
+        "cs:fix": "vendor/bin/php-cs-fixer fix",
+        "cs:check": "vendor/bin/php-cs-fixer fix --dry-run -vv"
+    },
+    "scripts-descriptions": {
+        "stan": "Performs static analysis",
+        "stan-baseline": "Regenerate phpstan baseline",
+        "cs:fix": "Performs code-style corrections on the whole codebase",
+        "cs:check": "Performs a code-style dry-run on the whole codebase"
     }
 }
