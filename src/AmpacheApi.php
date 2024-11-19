@@ -31,7 +31,7 @@ use SimpleXMLElement;
 class AmpacheApi
 {
     private const LIB_VERSION      = '2.0.0-develop';
-    private const API_VERSION      = '6.1.0';
+    private const API_VERSION      = '6.6.5';
     private const API3_METHOD_LIST = [
         'advanced_search',
         'album',
