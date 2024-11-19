@@ -274,25 +274,25 @@ class AmpacheApi
     ];
     private const API6_METHOD_LIST = [
         'advanced_search',
+        'album_songs',
         'album',
         'albums',
-        'album_songs',
-        'artist',
         'artist_albums',
-        'artists',
         'artist_songs',
-        'bookmark',
+        'artist',
+        'artists',
         'bookmark_create',
         'bookmark_delete',
         'bookmark_edit',
+        'bookmark',
         'bookmarks',
         'browse',
-        'catalog',
         'catalog_action',
         'catalog_add',
         'catalog_delete',
         'catalog_file',
         'catalog_folder',
+        'catalog',
         'catalogs',
         'deleted_podcast_episodes',
         'deleted_songs',
@@ -303,50 +303,55 @@ class AmpacheApi
         'followers',
         'following',
         'friends_timeline',
-        'genre',
         'genre_albums',
         'genre_artists',
-        'genres',
         'genre_songs',
+        'genre',
+        'genres',
         'get_art',
         'get_bookmark',
         'get_indexes',
         'get_similar',
         'goodbye',
         'handshake',
-        'label',
+        'index',
         'label_artists',
+        'label',
         'labels',
         'last_shouts',
+        'license_songs',
         'license',
         'licenses',
-        'license_songs',
         'list',
-        'live_stream',
         'live_stream_create',
         'live_stream_delete',
         'live_stream_edit',
+        'live_stream',
         'live_streams',
-        'localplay',
         'localplay_songs',
+        'localplay',
         'lost_password',
+        'now_playing',
         'ping',
-        'playlist',
+        'player',
         'playlist_add_song',
+        'playlist_add',
         'playlist_create',
         'playlist_delete',
         'playlist_edit',
         'playlist_generate',
+        'playlist_hash',
         'playlist_remove_song',
-        'playlists',
         'playlist_songs',
-        'podcast',
+        'playlist',
+        'playlists',
         'podcast_create',
         'podcast_delete',
         'podcast_edit',
-        'podcast_episode',
         'podcast_episode_delete',
+        'podcast_episode',
         'podcast_episodes',
+        'podcast',
         'podcasts',
         'preference_create',
         'preference_delete',
@@ -355,20 +360,27 @@ class AmpacheApi
         'record_play',
         'register',
         'scrobble',
+        'search_group',
         'search_songs',
-        'share',
+        'search',
         'share_create',
         'share_delete',
         'share_edit',
+        'share',
         'shares',
-        'song',
         'song_delete',
+        'song',
         'songs',
         'stats',
         'stream',
         'system_preference',
         'system_preferences',
         'system_update',
+        'tag_albums',
+        'tag_artists',
+        'tag_songs',
+        'tag',
+        'tags',
         'timeline',
         'toggle_follow',
         'update_art',
@@ -376,16 +388,18 @@ class AmpacheApi
         'update_from_tags',
         'update_podcast',
         'url_to_song',
-        'user',
         'user_create',
         'user_delete',
         'user_edit',
+        'user_playlists',
         'user_preference',
         'user_preferences',
-        'users',
+        'user_smartlists',
         'user_update',
+        'user',
+        'users',
         'video',
-        'videos'
+        'videos',
     ];
 
     // General Settings
@@ -465,24 +479,38 @@ class AmpacheApi
     {
         // Set up the handshake
         $time       = time();
-        $key        = hash('sha256', $this->password); // this password is already hashed
+        $key        = $this->password; // New ampache versions save this password encrypted
         $passphrase = hash('sha256', $time . $key);
 
         $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
 
         $options = array(
             'timestamp' => $time,
-            'auth' => $passphrase,
+            'auth' => $this->password,
             'version' => $this->server_version,
             'user' => $this->username
         );
 
         $results = $this->send_command('handshake', $options);
         if (!$results || empty($results->auth)) {
-            $this->set_state('error');
+            // try using unencrypted password from database
+            $key        = hash('sha256', $this->password);
+            $passphrase = hash('sha256', $time . $key);
+            $options    = array(
+                'timestamp' => $time,
+                'auth' => $passphrase,
+                'version' => $this->server_version,
+                'user' => $this->username
+            );
+            $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
+            $results = $this->send_command('handshake', $options);
+            if (!$results || empty($results->auth)) {
+                $this->set_state('error');
 
-            return false;
+                return false;
+            }
         }
+
         $this->api_auth = $results->auth;
         $this->set_state('connected');
         // Define when we pulled this, it is not wine, it does not get better with age
@@ -691,3 +719,4 @@ class AmpacheApi
         return false;
     }
 }
+
