@@ -5,9 +5,12 @@ $finder = PhpCsFixer\Finder::create()
     ->in('src/')
 ;
 
-$config = new PhpCsFixer\Config();
-return $config->setRules([
+return (new PhpCsFixer\Config())
+    ->setRules([
         '@PSR12' => true,
+        'array_syntax' => [
+            'syntax' => 'short'
+        ],
         'binary_operator_spaces' => [
             'operators' => ['=' => 'align']
         ],
@@ -20,7 +23,7 @@ return $config->setRules([
             'spacing' => 'one'
         ],
         'constant_case' => true,
-        'curly_braces_position' => [
+        'braces_position' => [
             'functions_opening_brace' => 'next_line_unless_newline_at_signature_end',
             'allow_single_line_empty_anonymous_classes' => true,
             'allow_single_line_anonymous_functions' => true
@@ -45,10 +48,12 @@ return $config->setRules([
         'single_blank_line_at_eof' => true,
         'strict_param' => false,
         'visibility_required' => true,
+        'no_unused_imports' => true,
     ])
     ->setIndent("    ")
-    ->setUsingCache(false)
     ->setFinder($finder)
     ->setLineEnding("\n")
+    ->setUsingCache(true)
+    ->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())
 ;
 

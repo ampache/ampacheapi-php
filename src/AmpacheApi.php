@@ -432,7 +432,7 @@ class AmpacheApi
      * away, otherwise we will simply return an object that can be reconfigured
      * and manually connected.
      */
-    public function __construct($config = array())
+    public function __construct($config = [])
     {
         // See if we are setting debug first
         if (isset($config['debug'])) {
@@ -484,24 +484,24 @@ class AmpacheApi
 
         $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
 
-        $options = array(
+        $options = [
             'timestamp' => $time,
             'auth' => $this->password,
             'version' => $this->server_version,
             'user' => $this->username
-        );
+        ];
 
         $results = $this->send_command('handshake', $options);
         if (!$results || empty($results->auth)) {
             // try using unencrypted password from database
             $key        = hash('sha256', $this->password);
             $passphrase = hash('sha256', $time . $key);
-            $options    = array(
+            $options    = [
                 'timestamp' => $time,
                 'auth' => $passphrase,
                 'version' => $this->server_version,
                 'user' => $this->username
-            );
+            ];
             $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
             $results = $this->send_command('handshake', $options);
             if (!$results || empty($results->auth)) {
@@ -527,7 +527,7 @@ class AmpacheApi
      * object. It doesn't really do anything fancy, but it's a separate function
      * so it can be called both from the constructor and directly.
      */
-    public function configure($config = array()): bool
+    public function configure($config = []): bool
     {
         //$this->_debug('CONFIGURE', 'Checking passed config options');
 
@@ -546,7 +546,7 @@ class AmpacheApi
         if (isset($config['server_version'])) {
             $this->server_version = (int)substr($config['server_version'], 0, 1);
         }
-        if (isset($config['api_format']) && in_array($config['api_format'], array('xml', 'json'))) {
+        if (isset($config['api_format']) && in_array($config['api_format'], ['xml', 'json'])) {
             $this->api_format = $config['api_format'];
         }
 
@@ -638,7 +638,7 @@ class AmpacheApi
      * @return string|SimpleXMLElement|null
      * @throws Exception
      */
-    public function send_command(string $command, ?array $options = array())
+    public function send_command(string $command, ?array $options = [])
     {
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
@@ -719,4 +719,3 @@ class AmpacheApi
         return false;
     }
 }
-
