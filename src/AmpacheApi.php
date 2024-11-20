@@ -503,7 +503,7 @@ class AmpacheApi
 
         $options = [
             'timestamp' => $time,
-            'auth' => $this->password,
+            'auth' => $passphrase,
             'version' => $this->server_version,
             'user' => $this->username
         ];
@@ -511,14 +511,9 @@ class AmpacheApi
         $results = $this->send_command('handshake', $options);
         if (!$results || empty($results->auth)) {
             // try using unencrypted password from database
-            $key        = hash('sha256', $this->password);
-            $passphrase = hash('sha256', $time . $key);
-            $options    = [
-                'timestamp' => $time,
-                'auth' => $passphrase,
-                'version' => $this->server_version,
-                'user' => $this->username
-            ];
+            $key             = hash('sha256', $this->password);
+            $passphrase      = hash('sha256', $time . $key);
+            $options['auth'] = $passphrase;
             $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
             $results = $this->send_command('handshake', $options);
             if (!$results || empty($results->auth)) {
