@@ -403,27 +403,37 @@ class AmpacheApi
     ];
 
     // General Settings
-    private $server;
-    private $username;
-    private $password;
-    private $api_secure;
+    private string $server;
+
+    private string $username;
+
+    private string $password;
+
+    private bool $api_secure = true;
 
     // Handshake variables
     /** @var string|SimpleXMLElement|null */
     private $handshake;
+
     private int $handshake_time; // Used to figure out how stale our data is
+
     private string $handshake_version;
 
     // Response variables
     private int $server_version = 6; // the version of API responses the client expects
-    private string $api_format  = 'xml'; // the version of API responses the client expects
+
+    private string $api_format = 'xml'; // the version of API responses the client expects
 
     // Constructed variables
+    private bool $_debug_output = false;
+
     private $_debug_callback = null;
-    private $_debug_output   = false;
+
     private $api_auth;
-    private $api_state = 'UNCONFIGURED';
-    private $api_url;
+
+    private string $api_state = 'UNCONFIGURED';
+
+    private string $api_url;
 
     /**
      * Constructor
@@ -431,8 +441,18 @@ class AmpacheApi
      * If enough information is provided then we will attempt to connect right
      * away, otherwise we will simply return an object that can be reconfigured
      * and manually connected.
+     * @param array{
+     *   username: string,
+     *   password: string,
+     *   server: string,
+     *   debug: ?bool,
+     *   debug_callback: ?string,
+     *   api_secure: ?bool,
+     *   api_format: ?string,
+     *   server_version: ?int
+     * } $config
      */
-    public function __construct($config = [])
+    public function __construct(array $config)
     {
         // See if we are setting debug first
         if (isset($config['debug'])) {
@@ -443,10 +463,7 @@ class AmpacheApi
             $this->_debug_callback = $config['debug_callback'];
         }
 
-        // If we got something, then configure!
-        if (is_array($config) && count($config)) {
-            $this->configure($config);
-        }
+        $this->configure($config);
 
         // If we've been READY'd then go ahead and attempt to connect
         if ($this->state() == 'READY') {
@@ -505,14 +522,14 @@ class AmpacheApi
             $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
             $results = $this->send_command('handshake', $options);
             if (!$results || empty($results->auth)) {
-                $this->set_state('error');
+                $this->set_state('ERROR');
 
                 return false;
             }
         }
 
         $this->api_auth = $results->auth;
-        $this->set_state('connected');
+        $this->set_state('CONNECTED');
         // Define when we pulled this, it is not wine, it does not get better with age
         $this->handshake_time = time();
         $this->handshake      = $results;
@@ -531,18 +548,15 @@ class AmpacheApi
     {
         //$this->_debug('CONFIGURE', 'Checking passed config options');
 
-        if (!is_array($config)) {
-            trigger_error('AmpacheApi::configure received a non-array value');
+        if (!is_array($config) || !isset($config['server']) || !isset($config['username'])) {
+            trigger_error('AmpacheApi::configure received invalid data, unable to configure');
 
             return false;
         }
 
-        if (isset($config['username'])) {
-            $this->username = $config['username'];
-        }
-        if (isset($config['password'])) {
-            $this->password = $config['password'];
-        }
+        $this->username = $config['username'];
+        $this->password = $config['password'] ?? null;
+
         if (isset($config['server_version'])) {
             $this->server_version = (int)substr($config['server_version'], 0, 1);
         }
@@ -574,17 +588,14 @@ class AmpacheApi
             ? 'https://'
             : 'http://';
 
-        if (isset($config['server'])) {
-            // Replace any http:// in the URL with ''
-            $config['server'] = str_replace($protocol, '', $config['server']);
-            $this->server     = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
-        }
-
-        $this->api_url = $protocol . $this->server . '/server/' . $this->api_format . '.server.php';
+        // Replace any http:// in the URL with ''
+        $config['server'] = str_replace($protocol, '', $config['server']);
+        $this->server     = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
+        $this->api_url    = $protocol . $this->server . '/server/' . $this->api_format . '.server.php';
 
         // See if we have enough to authenticate, if so change the state
         if (!empty($this->username) && !empty($this->server)) {
-            $this->set_state('ready');
+            $this->set_state('READY');
         }
 
         return true;
@@ -596,6 +607,7 @@ class AmpacheApi
      * This sets the current state of the API, it is used mostly internally but
      * the state can be accessed externally so it could be used to check and see
      * where the API is at, at this moment
+     * @param string $state
      */
     public function set_state($state)
     {
@@ -607,6 +619,7 @@ class AmpacheApi
      * state
      *
      * This returns the state of the API.
+     * @return string
      */
     public function state()
     {
