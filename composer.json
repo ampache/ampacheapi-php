@@ -4,7 +4,7 @@
     "description": "Ampache API PHP Library.",
     "keywords": ["ampache", "api", "library"],
     "homepage": "https://github.com/ampache/ampacheapi-php",
-    "license": "AGPL-3.0",
+    "license": "AGPL-3.0-only",
     "minimum-stability": "dev",
     "require": {
         "php": ">=7.4.0",
