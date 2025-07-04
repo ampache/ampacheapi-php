@@ -61,5 +61,6 @@ while ($total > $start) {
   foreach ($artists as $artist) {
     echo "\t" . $artist->name . "\n"
   }
+  $start = $start + $step;
 }
 ```
