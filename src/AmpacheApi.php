@@ -369,6 +369,7 @@ class AmpacheApi
         'share',
         'shares',
         'song_delete',
+        'song_tags',
         'song',
         'songs',
         'stats',
