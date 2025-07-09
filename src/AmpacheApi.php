@@ -30,8 +30,16 @@ use SimpleXMLElement;
 
 class AmpacheApi
 {
-    private const LIB_VERSION      = '2.0.0-develop';
-    private const API_VERSION      = '6.6.5';
+    private const LIB_VERSION = '2.0.0-develop';
+
+    private const API_VERSION = '6.8.1';
+
+    private const API3_VERSION = '390001';
+
+    private const API4_VERSION = '443000';
+
+    private const API5_VERSION = '5.5.6';
+
     private const API3_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -78,6 +86,7 @@ class AmpacheApi
         'video',
         'videos'
     ];
+
     private const API4_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -163,6 +172,7 @@ class AmpacheApi
         'video',
         'videos'
     ];
+
     private const API5_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -272,6 +282,7 @@ class AmpacheApi
         'video',
         'videos'
     ];
+
     private const API6_METHOD_LIST = [
         'advanced_search',
         'album_songs',
@@ -565,13 +576,13 @@ class AmpacheApi
         // set the correct handshake version or fallback to 3 for invalid versions
         switch ($this->server_version) {
             case 3:
-                $this->handshake_version = '390001';
+                $this->handshake_version = self::API3_VERSION;
                 break;
             case 4:
-                $this->handshake_version = '443000';
+                $this->handshake_version = self::API4_VERSION;
                 break;
             case 5:
-                $this->handshake_version = '5.5.6';
+                $this->handshake_version = self::API5_VERSION;
                 break;
             case 6:
             default:
