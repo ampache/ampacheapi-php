@@ -512,9 +512,10 @@ class AmpacheApi
         $time = time();
 
         // Check that your key is encrypted with sha256 and hash it if not.
-        $key = (hash('sha256', $this->password) === $this->password)
+        $hash = hash('sha256', $this->password);
+        $key  = ($hash === $this->password)
             ? $this->password
-            : hash('sha256', $this->password);
+            : $hash;
 
         $passphrase = hash('sha256', $time . $key);
 
