@@ -30,8 +30,16 @@ use SimpleXMLElement;
 
 class AmpacheApi
 {
-    private const LIB_VERSION      = '2.0.0-develop';
-    private const API_VERSION      = '6.1.0';
+    private const LIB_VERSION = '2.0.0-develop';
+
+    private const API_VERSION = '6.8.1';
+
+    private const API3_VERSION = '390001';
+
+    private const API4_VERSION = '443000';
+
+    private const API5_VERSION = '5.5.6';
+
     private const API3_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -78,6 +86,7 @@ class AmpacheApi
         'video',
         'videos'
     ];
+
     private const API4_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -163,6 +172,7 @@ class AmpacheApi
         'video',
         'videos'
     ];
+
     private const API5_METHOD_LIST = [
         'advanced_search',
         'album',
@@ -272,27 +282,28 @@ class AmpacheApi
         'video',
         'videos'
     ];
+
     private const API6_METHOD_LIST = [
         'advanced_search',
+        'album_songs',
         'album',
         'albums',
-        'album_songs',
-        'artist',
         'artist_albums',
-        'artists',
         'artist_songs',
-        'bookmark',
+        'artist',
+        'artists',
         'bookmark_create',
         'bookmark_delete',
         'bookmark_edit',
+        'bookmark',
         'bookmarks',
         'browse',
-        'catalog',
         'catalog_action',
         'catalog_add',
         'catalog_delete',
         'catalog_file',
         'catalog_folder',
+        'catalog',
         'catalogs',
         'deleted_podcast_episodes',
         'deleted_songs',
@@ -303,50 +314,56 @@ class AmpacheApi
         'followers',
         'following',
         'friends_timeline',
-        'genre',
         'genre_albums',
         'genre_artists',
-        'genres',
         'genre_songs',
+        'genre',
+        'genres',
         'get_art',
         'get_bookmark',
+        'get_external_metadata',
         'get_indexes',
         'get_similar',
         'goodbye',
         'handshake',
-        'label',
+        'index',
         'label_artists',
+        'label',
         'labels',
         'last_shouts',
+        'license_songs',
         'license',
         'licenses',
-        'license_songs',
         'list',
-        'live_stream',
         'live_stream_create',
         'live_stream_delete',
         'live_stream_edit',
+        'live_stream',
         'live_streams',
-        'localplay',
         'localplay_songs',
+        'localplay',
         'lost_password',
+        'now_playing',
         'ping',
-        'playlist',
+        'player',
         'playlist_add_song',
+        'playlist_add',
         'playlist_create',
         'playlist_delete',
         'playlist_edit',
         'playlist_generate',
+        'playlist_hash',
         'playlist_remove_song',
-        'playlists',
         'playlist_songs',
-        'podcast',
+        'playlist',
+        'playlists',
         'podcast_create',
         'podcast_delete',
         'podcast_edit',
-        'podcast_episode',
         'podcast_episode_delete',
+        'podcast_episode',
         'podcast_episodes',
+        'podcast',
         'podcasts',
         'preference_create',
         'preference_delete',
@@ -355,20 +372,29 @@ class AmpacheApi
         'record_play',
         'register',
         'scrobble',
+        'search_group',
+        'search_rules',
         'search_songs',
-        'share',
+        'search',
         'share_create',
         'share_delete',
         'share_edit',
+        'share',
         'shares',
-        'song',
         'song_delete',
+        'song_tags',
+        'song',
         'songs',
         'stats',
         'stream',
         'system_preference',
         'system_preferences',
         'system_update',
+        'tag_albums',
+        'tag_artists',
+        'tag_songs',
+        'tag',
+        'tags',
         'timeline',
         'toggle_follow',
         'update_art',
@@ -376,40 +402,49 @@ class AmpacheApi
         'update_from_tags',
         'update_podcast',
         'url_to_song',
-        'user',
         'user_create',
         'user_delete',
         'user_edit',
+        'user_playlists',
         'user_preference',
         'user_preferences',
-        'users',
+        'user_smartlists',
         'user_update',
+        'user',
+        'users',
         'video',
-        'videos'
+        'videos',
     ];
 
     // General Settings
-    private $server;
-    private $username;
-    private $password;
-    private $api_secure;
+    private string $username;
+
+    private string $password;
+
+    private bool $api_secure = true;
 
     // Handshake variables
     /** @var string|SimpleXMLElement|null */
     private $handshake;
-    private int $handshake_time; // Used to figure out how stale our data is
+
     private string $handshake_version;
 
     // Response variables
     private int $server_version = 6; // the version of API responses the client expects
-    private string $api_format  = 'xml'; // the version of API responses the client expects
+
+    private string $api_format = 'xml'; // the version of API responses the client expects
 
     // Constructed variables
+    private bool $_debug_output = false;
+
+    /** @property callable|null $_debug_callback */
     private $_debug_callback = null;
-    private $_debug_output   = false;
-    private $api_auth;
-    private $api_state = 'UNCONFIGURED';
-    private $api_url;
+
+    private ?string $api_auth = null;
+
+    private string $api_state = 'UNCONFIGURED';
+
+    private string $api_url;
 
     /**
      * Constructor
@@ -417,22 +452,30 @@ class AmpacheApi
      * If enough information is provided then we will attempt to connect right
      * away, otherwise we will simply return an object that can be reconfigured
      * and manually connected.
+     * @param array{
+     *   username: string,
+     *   password: string,
+     *   server: string,
+     *   debug?: ?bool,
+     *   debug_callback?: string,
+     *   api_secure?: bool,
+     *   api_format?: string,
+     *   server_version?: int|string
+     * } $config
+     * @throws Exception
      */
-    public function __construct($config = array())
+    public function __construct(array $config)
     {
         // See if we are setting debug first
         if (isset($config['debug'])) {
-            $this->_debug_output = $config['debug'];
+            $this->_debug_output = (bool)$config['debug'];
         }
 
         if (isset($config['debug_callback'])) {
             $this->_debug_callback = $config['debug_callback'];
         }
 
-        // If we got something, then configure!
-        if (is_array($config) && count($config)) {
-            $this->configure($config);
-        }
+        $this->configure($config);
 
         // If we've been READY'd then go ahead and attempt to connect
         if ($this->state() == 'READY') {
@@ -445,7 +488,7 @@ class AmpacheApi
      *
      * Make debugging all nice and pretty.
      */
-    private function _debug($source, $message)
+    private function _debug(string $source, string $message): void
     {
         if ($this->_debug_output) {
             echo "$source :: $message\n";
@@ -460,34 +503,43 @@ class AmpacheApi
      * connect
      *
      * This attempts to connect to the Ampache instance.
+     * @throws Exception
      */
     public function connect(): bool
     {
         // Set up the handshake
         $time       = time();
-        $key        = hash('sha256', $this->password); // this password is already hashed
+        $key        = $this->password; // New ampache versions save this password encrypted
         $passphrase = hash('sha256', $time . $key);
 
         $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
 
-        $options = array(
+        $options = [
             'timestamp' => $time,
             'auth' => $passphrase,
-            'version' => $this->server_version,
+            'version' => $this->handshake_version,
             'user' => $this->username
-        );
+        ];
 
         $results = $this->send_command('handshake', $options);
         if (!$results || empty($results->auth)) {
-            $this->set_state('error');
+            // try using unencrypted password from database
+            $key             = hash('sha256', $this->password);
+            $passphrase      = hash('sha256', $time . $key);
+            $options['auth'] = $passphrase;
+            $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
+            $results = $this->send_command('handshake', $options);
+            if (!$results || empty($results->auth)) {
+                $this->set_state('ERROR');
 
-            return false;
+                return false;
+            }
         }
-        $this->api_auth = $results->auth;
-        $this->set_state('connected');
-        // Define when we pulled this, it is not wine, it does not get better with age
-        $this->handshake_time = time();
-        $this->handshake      = $results;
+
+        $this->api_auth  = (string)$results->auth;
+        $this->handshake = $results;
+
+        $this->set_state('CONNECTED');
 
         return true;
     }
@@ -498,40 +550,47 @@ class AmpacheApi
      * This function takes an array of elements and configures the AmpacheApi
      * object. It doesn't really do anything fancy, but it's a separate function
      * so it can be called both from the constructor and directly.
+     * @param array{
+     *   username: string,
+     *   password: string,
+     *   server: string,
+     *   debug?: ?bool,
+     *   debug_callback?: string,
+     *   api_secure?: bool,
+     *   api_format?: string,
+     *   server_version?: int|string
+     * } $config
      */
-    public function configure($config = array()): bool
+    public function configure(array $config): bool
     {
         //$this->_debug('CONFIGURE', 'Checking passed config options');
 
-        if (!is_array($config)) {
-            trigger_error('AmpacheApi::configure received a non-array value');
+        if (!$config['server'] || !$config['username'] || !$config['password']) {
+            trigger_error('AmpacheApi::configure received invalid data, unable to configure');
 
             return false;
         }
 
-        if (isset($config['username'])) {
-            $this->username = $config['username'];
-        }
-        if (isset($config['password'])) {
-            $this->password = $config['password'];
-        }
+        $this->username = $config['username'];
+        $this->password = $config['password'];
+
         if (isset($config['server_version'])) {
-            $this->server_version = (int)substr($config['server_version'], 0, 1);
+            $this->server_version = (int)substr((string)$config['server_version'], 0, 1);
         }
-        if (isset($config['api_format']) && in_array($config['api_format'], array('xml', 'json'))) {
+        if (isset($config['api_format']) && in_array($config['api_format'], ['xml', 'json'])) {
             $this->api_format = $config['api_format'];
         }
 
         // set the correct handshake version or fallback to 3 for invalid versions
         switch ($this->server_version) {
             case 3:
-                $this->handshake_version = '390001';
+                $this->handshake_version = self::API3_VERSION;
                 break;
             case 4:
-                $this->handshake_version = '443000';
+                $this->handshake_version = self::API4_VERSION;
                 break;
             case 5:
-                $this->handshake_version = '5.5.6';
+                $this->handshake_version = self::API5_VERSION;
                 break;
             case 6:
             default:
@@ -546,17 +605,14 @@ class AmpacheApi
             ? 'https://'
             : 'http://';
 
-        if (isset($config['server'])) {
-            // Replace any http:// in the URL with ''
-            $config['server'] = str_replace($protocol, '', $config['server']);
-            $this->server     = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
-        }
-
-        $this->api_url = $protocol . $this->server . '/server/' . $this->api_format . '.server.php';
+        // Replace any http:// in the URL with ''
+        $config['server'] = str_replace($protocol, '', $config['server']);
+        $server           = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
+        $this->api_url    = $protocol . $server . '/server/' . $this->api_format . '.server.php';
 
         // See if we have enough to authenticate, if so change the state
-        if (!empty($this->username) && !empty($this->server)) {
-            $this->set_state('ready');
+        if (!empty($this->username)) {
+            $this->set_state('READY');
         }
 
         return true;
@@ -569,7 +625,7 @@ class AmpacheApi
      * the state can be accessed externally so it could be used to check and see
      * where the API is at, at this moment
      */
-    public function set_state($state)
+    public function set_state(string $state): void
     {
         // Very simple for now, maybe we'll do something more with this later
         $this->api_state = strtoupper($state);
@@ -580,7 +636,7 @@ class AmpacheApi
      *
      * This returns the state of the API.
      */
-    public function state()
+    public function state(): string
     {
         return $this->api_state;
     }
@@ -607,10 +663,11 @@ class AmpacheApi
      *
      * This sends an API command with options to the currently connected
      * host.
+     * @param array<string, mixed> $options
      * @return string|SimpleXMLElement|null
      * @throws Exception
      */
-    public function send_command(string $command, ?array $options = array())
+    public function send_command(string $command, ?array $options = [])
     {
         $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
 
@@ -627,14 +684,16 @@ class AmpacheApi
 
         $url = $this->api_url . '?action=' . urlencode($command);
 
-        foreach ($options as $key => $value) {
-            $key = trim($key);
-            if (!$key) {
-                // Nonfatal, don't need to throw an exception
-                trigger_error('AmpacheApi::send_command unable to append empty variable to command');
-                continue;
+        if (is_array($options) && !empty($options)) {
+            foreach ($options as $key => $value) {
+                $key = trim($key);
+                if (!$key) {
+                    // Nonfatal, don't need to throw an exception
+                    trigger_error('AmpacheApi::send_command unable to append empty variable to command');
+                    continue;
+                }
+                $url .= '&' . urlencode($key) . '=' . urlencode($value);
             }
-            $url .= '&' . urlencode($key) . '=' . urlencode($value);
         }
 
         // If auth is set then we append it so callers don't have to.
@@ -651,7 +710,7 @@ class AmpacheApi
 
         switch ($this->api_format) {
             case 'json':
-                $result = json_decode($data);
+                $result = json_decode($data, true);
                 if (!$result) {
                     return null;
                 }
@@ -675,7 +734,7 @@ class AmpacheApi
      * commands for the current version of Ampache. If no version is known yet
      * it should return FALSE for everything except ping and handshake.
      */
-    public function validate_command($command): bool
+    public function validate_command(string $command): bool
     {
         switch ($this->server_version) {
             case 3:
