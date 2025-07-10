@@ -27,8 +27,8 @@ When creating an AmpacheApi object config is set using a config array.
   * password: string - sha256 hashed API password
   * server: string - Server address, without http/https prefix
 * Optional
-  * debug: bool - Enable debug mode (default: false)
-  * debug_callback: string - server callback function (default: null)
+  * debug: bool - Enable debug mode which will echo debug messages (default: false)
+  * debug_callback: string - server callback debugging function (default: null)
   * api_secure: bool - Set to false to use http (default: true)
   * api_format: string - Set API response version. 3, 4, 5, 6 (default: 6)
   * server_version: int - Set API response format. xml, json (default: json)
