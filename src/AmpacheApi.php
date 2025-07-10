@@ -417,8 +417,6 @@ class AmpacheApi
     ];
 
     // General Settings
-    private string $server;
-
     private string $username;
 
     private string $password;
@@ -441,9 +439,10 @@ class AmpacheApi
     // Constructed variables
     private bool $_debug_output = false;
 
+    /** @property callable|null $_debug_callback */
     private $_debug_callback = null;
 
-    private $api_auth;
+    private ?string $api_auth = null;
 
     private string $api_state = 'UNCONFIGURED';
 
@@ -490,7 +489,7 @@ class AmpacheApi
      *
      * Make debugging all nice and pretty.
      */
-    private function _debug(string $source, string $message)
+    private function _debug(string $source, string $message): void
     {
         if ($this->_debug_output) {
             echo "$source :: $message\n";
@@ -537,7 +536,7 @@ class AmpacheApi
             }
         }
 
-        $this->api_auth = $results->auth;
+        $this->api_auth = (string)$results->auth;
         $this->set_state('CONNECTED');
         // Define when we pulled this, it is not wine, it does not get better with age
         $this->handshake_time = time();
@@ -609,11 +608,11 @@ class AmpacheApi
 
         // Replace any http:// in the URL with ''
         $config['server'] = str_replace($protocol, '', $config['server']);
-        $this->server     = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
-        $this->api_url    = $protocol . $this->server . '/server/' . $this->api_format . '.server.php';
+        $server           = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
+        $this->api_url    = $protocol . $server . '/server/' . $this->api_format . '.server.php';
 
         // See if we have enough to authenticate, if so change the state
-        if (!empty($this->username) && !empty($this->server)) {
+        if (!empty($this->username)) {
             $this->set_state('READY');
         }
 
@@ -627,7 +626,7 @@ class AmpacheApi
      * the state can be accessed externally so it could be used to check and see
      * where the API is at, at this moment
      */
-    public function set_state(string $state)
+    public function set_state(string $state): void
     {
         // Very simple for now, maybe we'll do something more with this later
         $this->api_state = strtoupper($state);
@@ -637,9 +636,8 @@ class AmpacheApi
      * state
      *
      * This returns the state of the API.
-     * @return string
      */
-    public function state()
+    public function state(): string
     {
         return $this->api_state;
     }
@@ -666,6 +664,7 @@ class AmpacheApi
      *
      * This sends an API command with options to the currently connected
      * host.
+     * @param array<string, mixed> $options
      * @return string|SimpleXMLElement|null
      * @throws Exception
      */
@@ -686,14 +685,16 @@ class AmpacheApi
 
         $url = $this->api_url . '?action=' . urlencode($command);
 
-        foreach ($options as $key => $value) {
-            $key = trim($key);
-            if (!$key) {
-                // Nonfatal, don't need to throw an exception
-                trigger_error('AmpacheApi::send_command unable to append empty variable to command');
-                continue;
+        if (is_array($options) && !empty($options)) {
+            foreach ($options as $key => $value) {
+                $key = trim($key);
+                if (!$key) {
+                    // Nonfatal, don't need to throw an exception
+                    trigger_error('AmpacheApi::send_command unable to append empty variable to command');
+                    continue;
+                }
+                $url .= '&' . urlencode($key) . '=' . urlencode($value);
             }
-            $url .= '&' . urlencode($key) . '=' . urlencode($value);
         }
 
         // If auth is set then we append it so callers don't have to.

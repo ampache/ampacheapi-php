@@ -1,32 +1,7 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Argument of an invalid type array\\|null supplied for foreach, only iterables are supported\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:_debug\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:send_command\\(\\) has parameter \\$options with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:set_state\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
 			message: "#^Property AmpacheApi\\\\AmpacheApi\\:\\:\\$_debug_callback has no type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Property AmpacheApi\\\\AmpacheApi\\:\\:\\$api_auth has no type specified\\.$#"
 			count: 1
 			path: src/AmpacheApi.php
 
@@ -39,4 +14,3 @@ parameters:
 			message: "#^Property AmpacheApi\\\\AmpacheApi\\:\\:\\$handshake_version is never read, only written\\.$#"
 			count: 1
 			path: src/AmpacheApi.php
-
