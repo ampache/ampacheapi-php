@@ -20,17 +20,33 @@ Ampache API PHP Library is free software; you can redistribute it and/or modify 
 
 ### Initialize
 
-```php
-$ampache = new AmpacheApi(array(
-   'username' => 'user1', // Username
-   'password' => 'test', // Password
-   'server' => 'localhost', // Server address, without http/https prefix
-   'debug_callback' => 'debug_event', // server callback function
-   'api_secure' => 'false' // Set to true to use https
-   'api_version' => 6 // Set API response version. 3, 4, 5, 6 (default: 6)
-   'api_format' => 'xml' // Set API response format. xml, json (default: json)
-));
+When creating an AmpacheApi object config is set using a config array.
 
+* Required
+  * username: string - Your API username
+  * password: string - sha256 hashed API password
+  * server: string - Server address, without http/https prefix
+* Optional
+  * debug: bool - Enable debug mode (default: false)
+  * debug_callback: string - server callback function (default: null)
+  * api_secure: bool - Set to false to use http (default: true)
+  * api_format: string - Set API response version. 3, 4, 5, 6 (default: 6)
+  * server_version: int - Set API response format. xml, json (default: json)
+
+So as an example; this is how the Ampache server would initialize the library.
+
+```php
+$config  = [
+   'username' => 'user1',
+   'password' => hash('sha256', 'test'),
+   'server' => 'develop.ampache.dev',
+   'debug' => true,
+   'debug_callback' => 'debug_event',
+   'api_version' => 6,
+   'api_format' => 'json',
+];
+
+$ampache = new AmpacheApi($config);
 if ($ampache->state() != 'CONNECTED') {
   echo "Ampache API client failed to connected.\n";
   exit;
