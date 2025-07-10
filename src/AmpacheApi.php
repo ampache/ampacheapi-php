@@ -456,7 +456,7 @@ class AmpacheApi
      *   username: string,
      *   password: string,
      *   server: string,
-     *   debug?: bool,
+     *   debug?: ?bool,
      *   debug_callback?: string,
      *   api_secure?: bool,
      *   api_format?: string,
@@ -468,7 +468,7 @@ class AmpacheApi
     {
         // See if we are setting debug first
         if (isset($config['debug'])) {
-            $this->_debug_output = $config['debug'];
+            $this->_debug_output = (bool)$config['debug'];
         }
 
         if (isset($config['debug_callback'])) {
@@ -554,7 +554,7 @@ class AmpacheApi
      *   username: string,
      *   password: string,
      *   server: string,
-     *   debug?: bool,
+     *   debug?: ?bool,
      *   debug_callback?: string,
      *   api_secure?: bool,
      *   api_format?: string,
