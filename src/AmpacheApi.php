@@ -462,6 +462,7 @@ class AmpacheApi
      *   api_format?: string,
      *   server_version?: int|string
      * } $config
+     * @throws Exception
      */
     public function __construct(array $config)
     {
@@ -502,6 +503,7 @@ class AmpacheApi
      * connect
      *
      * This attempts to connect to the Ampache instance.
+     * @throws Exception
      */
     public function connect(): bool
     {
