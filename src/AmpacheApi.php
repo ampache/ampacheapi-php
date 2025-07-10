@@ -540,7 +540,7 @@ class AmpacheApi
                     break;
                 case 'xml':
                 default:
-                    $auth = ($results instanceof SimpleXMLElement)
+                    $auth = ($results instanceof SimpleXMLElement && !empty($results->auth))
                         ? (string)$results->auth
                         : null;
             }
