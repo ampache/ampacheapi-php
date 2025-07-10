@@ -463,7 +463,7 @@ class AmpacheApi
      *   debug_callback?: string,
      *   api_secure?: bool,
      *   api_format?: string,
-     *   server_version?: int
+     *   server_version?: int|string
      * } $config
      */
     public function __construct(array $config)
@@ -560,24 +560,24 @@ class AmpacheApi
      *   debug_callback?: string,
      *   api_secure?: bool,
      *   api_format?: string,
-     *   server_version?: int
+     *   server_version?: int|string
      * } $config
      */
     public function configure(array $config): bool
     {
         //$this->_debug('CONFIGURE', 'Checking passed config options');
 
-        if (empty($config) || !isset($config['server']) || !isset($config['username'])) {
+        if (!$config['server'] || !$config['username'] || !$config['password']) {
             trigger_error('AmpacheApi::configure received invalid data, unable to configure');
 
             return false;
         }
 
         $this->username = $config['username'];
-        $this->password = $config['password'] ?? null;
+        $this->password = $config['password'];
 
         if (isset($config['server_version'])) {
-            $this->server_version = (int)substr($config['server_version'], 0, 1);
+            $this->server_version = (int)substr((string)$config['server_version'], 0, 1);
         }
         if (isset($config['api_format']) && in_array($config['api_format'], ['xml', 'json'])) {
             $this->api_format = $config['api_format'];

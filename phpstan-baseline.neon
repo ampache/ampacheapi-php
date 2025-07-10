@@ -11,32 +11,12 @@ parameters:
 			path: src/AmpacheApi.php
 
 		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:_debug\\(\\) has parameter \\$message with no type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:_debug\\(\\) has parameter \\$source with no type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:configure\\(\\) has parameter \\$config with no type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
 			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:send_command\\(\\) has parameter \\$options with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/AmpacheApi.php
 
 		-
 			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:set_state\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Method AmpacheApi\\\\AmpacheApi\\:\\:validate_command\\(\\) has parameter \\$command with no type specified\\.$#"
 			count: 1
 			path: src/AmpacheApi.php
 
