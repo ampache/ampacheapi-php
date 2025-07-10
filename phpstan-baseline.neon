@@ -4,13 +4,3 @@ parameters:
 			message: "#^Property AmpacheApi\\\\AmpacheApi\\:\\:\\$_debug_callback has no type specified\\.$#"
 			count: 1
 			path: src/AmpacheApi.php
-
-		-
-			message: "#^Property AmpacheApi\\\\AmpacheApi\\:\\:\\$handshake_time is never read, only written\\.$#"
-			count: 1
-			path: src/AmpacheApi.php
-
-		-
-			message: "#^Property AmpacheApi\\\\AmpacheApi\\:\\:\\$handshake_version is never read, only written\\.$#"
-			count: 1
-			path: src/AmpacheApi.php

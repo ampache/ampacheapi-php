@@ -427,8 +427,6 @@ class AmpacheApi
     /** @var string|SimpleXMLElement|null */
     private $handshake;
 
-    private int $handshake_time; // Used to figure out how stale our data is
-
     private string $handshake_version;
 
     // Response variables
@@ -517,7 +515,7 @@ class AmpacheApi
         $options = [
             'timestamp' => $time,
             'auth' => $passphrase,
-            'version' => $this->server_version,
+            'version' => $this->handshake_version,
             'user' => $this->username
         ];
 
@@ -536,11 +534,10 @@ class AmpacheApi
             }
         }
 
-        $this->api_auth = (string)$results->auth;
+        $this->api_auth  = (string)$results->auth;
+        $this->handshake = $results;
+
         $this->set_state('CONNECTED');
-        // Define when we pulled this, it is not wine, it does not get better with age
-        $this->handshake_time = time();
-        $this->handshake      = $results;
 
         return true;
     }
