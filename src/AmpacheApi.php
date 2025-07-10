@@ -509,7 +509,7 @@ class AmpacheApi
     {
         // Set up the handshake
         $time       = time();
-        $key        = $this->password; // New ampache versions save this password encrypted
+        $key        = hash('sha256', $this->password); // New ampache versions save this password encrypted
         $passphrase = hash('sha256', $time . $key);
 
         $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
@@ -522,21 +522,21 @@ class AmpacheApi
         ];
 
         $results = $this->send_command('handshake', $options);
-        if (!$results || empty($results->auth)) {
+        if (!$results || empty($results["auth"])) {
             // try using unencrypted password from database
-            $key             = hash('sha256', $this->password);
+            $key             = $this->password;
             $passphrase      = hash('sha256', $time . $key);
             $options['auth'] = $passphrase;
             $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
             $results = $this->send_command('handshake', $options);
-            if (!$results || empty($results->auth)) {
+            if (!$results || empty($results["auth"])) {
                 $this->set_state('ERROR');
 
                 return false;
             }
         }
 
-        $this->api_auth  = (string)$results->auth;
+        $this->api_auth  = (string)$results["auth"];
         $this->handshake = $results;
 
         $this->set_state('CONNECTED');
