@@ -424,7 +424,8 @@ class AmpacheApi
     private bool $api_secure = true;
 
     // Handshake variables
-    /** @var string|SimpleXMLElement|null */
+
+    /** @var array<string, mixed>|SimpleXMLElement|null */
     private $handshake;
 
     private string $handshake_version;
@@ -508,8 +509,13 @@ class AmpacheApi
     public function connect(): bool
     {
         // Set up the handshake
-        $time       = time();
-        $key        = hash('sha256', $this->password); // New ampache versions save this password encrypted
+        $time = time();
+
+        // Check that your key is encrypted with sha256 and hash it if not.
+        $key = (hash('sha256', $this->password) === $this->password)
+            ? $this->password
+            : hash('sha256', $this->password);
+
         $passphrase = hash('sha256', $time . $key);
 
         $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
@@ -522,26 +528,35 @@ class AmpacheApi
         ];
 
         $results = $this->send_command('handshake', $options);
-        if (!$results || empty($results["auth"])) {
-            // try using unencrypted password from database
-            $key             = $this->password;
-            $passphrase      = hash('sha256', $time . $key);
-            $options['auth'] = $passphrase;
-            $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
-            $results = $this->send_command('handshake', $options);
-            if (!$results || empty($results["auth"])) {
-                $this->set_state('ERROR');
 
-                return false;
+        $auth = null;
+        if ($results) {
+            switch ($this->api_format) {
+                case 'json':
+                    $auth = (is_array($results) && isset($results["auth"]))
+                        ? $results["auth"]
+                        : null;
+                    break;
+                case 'xml':
+                default:
+                    $auth = ($results instanceof SimpleXMLElement)
+                        ? (string)$results->auth
+                        : null;
             }
         }
 
-        $this->api_auth  = (string)$results["auth"];
-        $this->handshake = $results;
+        // update on successful authentication
+        if ($auth) {
+            $this->set_state('CONNECTED');
+            $this->api_auth  = $auth;
+            $this->handshake = $results;
 
-        $this->set_state('CONNECTED');
+            return true;
+        }
 
-        return true;
+        $this->set_state('ERROR');
+
+        return false;
     }
 
     /**
@@ -646,7 +661,7 @@ class AmpacheApi
      *
      * Returns the information gathered by the handshake.
      * Not raw so we can format it if we want?
-     * @return string|SimpleXMLElement|null
+     * @return array<string, mixed>|SimpleXMLElement|null
      * @throws Exception
      */
     public function info()
@@ -664,7 +679,7 @@ class AmpacheApi
      * This sends an API command with options to the currently connected
      * host.
      * @param array<string, mixed> $options
-     * @return string|SimpleXMLElement|null
+     * @return array<string, mixed>|SimpleXMLElement|null
      * @throws Exception
      */
     public function send_command(string $command, ?array $options = [])
