@@ -48,7 +48,7 @@ $config  = [
 
 $ampache = new AmpacheApi($config);
 if ($ampache->state() != 'CONNECTED') {
-  echo "Ampache API client failed to connected.\n";
+  echo "Ampache API client failed to connect.\n";
   exit;
 }
 ```
