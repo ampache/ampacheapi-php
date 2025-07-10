@@ -459,11 +459,11 @@ class AmpacheApi
      *   username: string,
      *   password: string,
      *   server: string,
-     *   debug: ?bool,
-     *   debug_callback: ?string,
-     *   api_secure: ?bool,
-     *   api_format: ?string,
-     *   server_version: ?int
+     *   debug?: bool,
+     *   debug_callback?: string,
+     *   api_secure?: bool,
+     *   api_format?: string,
+     *   server_version?: int
      * } $config
      */
     public function __construct(array $config)
@@ -490,7 +490,7 @@ class AmpacheApi
      *
      * Make debugging all nice and pretty.
      */
-    private function _debug($source, $message)
+    private function _debug(string $source, string $message)
     {
         if ($this->_debug_output) {
             echo "$source :: $message\n";
@@ -552,12 +552,22 @@ class AmpacheApi
      * This function takes an array of elements and configures the AmpacheApi
      * object. It doesn't really do anything fancy, but it's a separate function
      * so it can be called both from the constructor and directly.
+     * @param array{
+     *   username: string,
+     *   password: string,
+     *   server: string,
+     *   debug?: bool,
+     *   debug_callback?: string,
+     *   api_secure?: bool,
+     *   api_format?: string,
+     *   server_version?: int
+     * } $config
      */
-    public function configure($config = []): bool
+    public function configure(array $config): bool
     {
         //$this->_debug('CONFIGURE', 'Checking passed config options');
 
-        if (!is_array($config) || !isset($config['server']) || !isset($config['username'])) {
+        if (empty($config) || !isset($config['server']) || !isset($config['username'])) {
             trigger_error('AmpacheApi::configure received invalid data, unable to configure');
 
             return false;
@@ -616,9 +626,8 @@ class AmpacheApi
      * This sets the current state of the API, it is used mostly internally but
      * the state can be accessed externally so it could be used to check and see
      * where the API is at, at this moment
-     * @param string $state
      */
-    public function set_state($state)
+    public function set_state(string $state)
     {
         // Very simple for now, maybe we'll do something more with this later
         $this->api_state = strtoupper($state);
@@ -701,7 +710,7 @@ class AmpacheApi
 
         switch ($this->api_format) {
             case 'json':
-                $result = json_decode($data);
+                $result = json_decode($data, true);
                 if (!$result) {
                     return null;
                 }
@@ -725,7 +734,7 @@ class AmpacheApi
      * commands for the current version of Ampache. If no version is known yet
      * it should return FALSE for everything except ping and handshake.
      */
-    public function validate_command($command): bool
+    public function validate_command(string $command): bool
     {
         switch ($this->server_version) {
             case 3:
