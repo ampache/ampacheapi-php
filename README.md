@@ -80,3 +80,5 @@ while ($total > $start) {
   $start = $start + $step;
 }
 ```
+
+Look in the [/examples](https://github.com/ampache/ampacheapi-php/tree/master/examples) folder for more.
