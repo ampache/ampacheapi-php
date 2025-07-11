@@ -36,20 +36,26 @@ When creating an AmpacheApi object config is set using a config array.
 So as an example; this is how the Ampache server would initialize the library.
 
 ```php
+// your own username and password are required to use Ampache server
+$username = 'demo';
+$password = 'demodemo';
+$hash     = hash('sha256', $password);
+$server   = 'develop.ampache.dev';
+
 $config  = [
-   'username' => 'user1',
-   'password' => hash('sha256', 'test'),
-   'server' => 'develop.ampache.dev',
-   'debug' => true,
-   'debug_callback' => 'debug_event',
-   'api_version' => 6,
-   'api_format' => 'json',
+    'username' => $username,
+    'password' => $password,
+    'server' => $server,
+    'debug' => true,
+    'debug_callback' => null,
+    'api_version' => 6,
+    'api_format' => 'json',
 ];
 
 $ampache = new AmpacheApi($config);
 if ($ampache->state() != 'CONNECTED') {
-  echo "Ampache API client failed to connect.\n";
-  exit;
+    echo "Ampache API client failed to connect.\n";
+    exit;
 }
 ```
 
@@ -57,27 +63,27 @@ if ($ampache->state() != 'CONNECTED') {
 
 ```php
 $stats = $ampache->info();
-echo "Songs: " . $stats->songs . "<br />\n";
-echo "Albums: " . $stats->albums . "<br />\n";
-echo "Artists: " . $stats->artists . "<br />\n";
-echo "Playlists: " . $stats->playlists . "<br />\n";
-echo "Videos: " . $stats->videos . "<br />\n";
+echo "Songs: " . $stats['songs'] . "<br />\n";
+echo "Albums: " . $stats['albums'] . "<br />\n";
+echo "Artists: " . $stats['artists'] . "<br />\n";
+echo "Playlists: " . $stats['playlists'] . "<br />\n";
+echo "Videos: " . $stats['videos'] . "<br />\n";
 ```
 
 ### Get all artists
 
 ```php
-$total = $stats->artists;
-$step = 500; // Request per 500
+$total = $stats['artists'];
+$step  = 500; // Request per 500
 $start = 0;
 
 echo "Artists: <br />\n";
 while ($total > $start) {
-  $artists = $ampache->send_command('artists', array('offset' => $start, 'limit' => $step));
-  foreach ($artists as $artist) {
-    echo "\t" . $artist->name . "\n"
-  }
-  $start = $start + $step;
+    $artists = $ampache->send_command('artists', ['offset' => $start, 'limit' => $step]);
+    foreach ($artists['artist'] as $artist) {
+        echo "\t" . $artist['name'] . "\n";
+    }
+    $start = $start + $step;
 }
 ```
 
