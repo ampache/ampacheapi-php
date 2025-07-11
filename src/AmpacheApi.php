@@ -723,23 +723,22 @@ class AmpacheApi
             return null;
         }
 
+        $result = null;
         switch ($this->api_format) {
             case 'json':
                 $result = json_decode($data, true);
-                if (!$result) {
-                    return null;
-                }
-
-                return $result;
+                break;
             case 'xml':
-            default:
                 $result = simplexml_load_string($data);
-                if (!$result) {
-                    return null;
-                }
-
-                return $result;
         }
+
+        if (!$result) {
+            $this->_debug('EMPTY RESPONSE', $command);
+
+            return null;
+        }
+
+        return $result;
     }
 
     /**
