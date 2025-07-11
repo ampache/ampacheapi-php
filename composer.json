@@ -9,8 +9,7 @@
     "require": {
         "php": ">=7.4.0",
         "ext-xml": "*",
-        "ext-json": "*",
-        "ext-simplexml": "*"
+        "ext-json": "*"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.49",
