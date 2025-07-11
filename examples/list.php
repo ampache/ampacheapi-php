@@ -6,7 +6,8 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 // your own username and password are required to use Ampache server
 $username = 'demo';
-$password = hash('sha256', 'demodemo');
+$password = 'demodemo';
+$hash     = hash('sha256', $password);
 $server   = 'develop.ampache.dev';
 
 $config  = [
@@ -29,6 +30,15 @@ try {
         exit;
     }
 
+    $config['password'] = $hash;
+
+    $ampache = new AmpacheApi($config);
+    if ($ampache->state() != 'CONNECTED') {
+        echo "Ampache API client failed to connect.\n";
+        exit;
+    }
+    $config['password'] = $password;
+
     print_r($ampache->send_command('songs', ['limit' => 1, 'offset' => 0]));
 
 } catch (Exception $exception) {
@@ -45,8 +55,19 @@ try {
         exit;
     }
 
+    $config['password'] = $hash;
+
+    $ampache = new AmpacheApi($config);
+    if ($ampache->state() != 'CONNECTED') {
+        echo "Ampache API client failed to connect.\n";
+        exit;
+    }
+    $config['password'] = $password;
+
     print_r($ampache->send_command('songs', ['limit' => 1, 'offset' => 0]));
 
 } catch (Exception $exception) {
     die($exception->getMessage());
 }
+
+echo "COMPLETED\n";
