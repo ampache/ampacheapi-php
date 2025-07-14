@@ -24,17 +24,20 @@ echo "Connecting to Ampache API at $server with user $username...\n";
 
 try {
     echo "JSON connection...\n";
+
+    // connect with plain text password first
     $ampache = new AmpacheApi($config);
     if ($ampache->state() != 'CONNECTED') {
-        echo "Ampache API client failed to connect.\n";
+        echo "Ampache API client failed to connect using a plain text password.\n";
         exit;
     }
 
     $config['password'] = $hash;
-
+    // connect with hashed password to emulate stored database password
     $ampache = new AmpacheApi($config);
+
     if ($ampache->state() != 'CONNECTED') {
-        echo "Ampache API client failed to connect.\n";
+        echo "Ampache API client failed to connect using a sha256 hash password.\n";
         exit;
     }
     $config['password'] = $password;
@@ -49,17 +52,18 @@ try {
     echo "XML connection...\n";
     $config['api_format'] = 'xml';
 
+    // connect with plain text password first
     $ampache = new AmpacheApi($config);
     if ($ampache->state() != 'CONNECTED') {
-        echo "Ampache API client failed to connect.\n";
+        echo "Ampache API client failed to connect using a plain text password.\n";
         exit;
     }
 
     $config['password'] = $hash;
-
+    // connect with hashed password to emulate stored database password
     $ampache = new AmpacheApi($config);
     if ($ampache->state() != 'CONNECTED') {
-        echo "Ampache API client failed to connect.\n";
+        echo "Ampache API client failed to connect using a sha256 hash password.\n";
         exit;
     }
     $config['password'] = $password;
