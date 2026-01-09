@@ -674,21 +674,16 @@ class AmpacheApi
     }
 
     /**
-     * send_command
+     * get_command_url
      *
-     * This sends an API command with options to the currently connected
-     * host.
+     * This builds and returns the command URL for the specified command and
+     * options.
      * @param array<string, mixed> $options
-     * @return array<string, mixed>|SimpleXMLElement|null
+     * @return string
      * @throws Exception
      */
-    public function send_command(string $command, ?array $options = [])
+    public function get_command_url(string $command, ?array $options = []): string
     {
-        $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
-
-        if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
-        }
         $command = trim($command);
         if (!$command) {
             throw new Exception('AmpacheApi::send_command no command specified');
@@ -715,6 +710,35 @@ class AmpacheApi
         if ($this->api_auth) {
             $url .= '&auth=' . urlencode($this->api_auth) . '&username=' . urlencode($this->username);
         }
+
+        return $url;
+    }
+
+    /**
+     * send_command
+     *
+     * This sends an API command with options to the currently connected
+     * host.
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>|SimpleXMLElement|null
+     * @throws Exception
+     */
+    public function send_command(string $command, ?array $options = [])
+    {
+        $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
+
+        if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
+            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
+        }
+        $command = trim($command);
+        if (!$command) {
+            throw new Exception('AmpacheApi::send_command no command specified');
+        }
+        if (!$this->validate_command($command)) {
+            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
+        }
+
+        $url = $this->get_command_url($command, $options);
 
         $this->_debug('COMMAND URL', $url);
 
