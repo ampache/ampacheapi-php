@@ -32,7 +32,9 @@ class AmpacheApi
 {
     private const LIB_VERSION = '2.0.0-develop';
 
-    private const API_VERSION = '6.8.1';
+    private const API8_VERSION = '8.0.0';
+
+    private const API6_VERSION = '6.9.1';
 
     private const API3_VERSION = '390001';
 
@@ -416,6 +418,136 @@ class AmpacheApi
         'videos',
     ];
 
+    private const API8_METHOD_LIST = [
+        'advanced_search',
+        'album_songs',
+        'album',
+        'albums',
+        'artist_albums',
+        'artist_songs',
+        'artist',
+        'artists',
+        'bookmark_create',
+        'bookmark_delete',
+        'bookmark_edit',
+        'bookmark',
+        'bookmarks',
+        'browse',
+        'catalog_action',
+        'catalog_add',
+        'catalog_delete',
+        'catalog_file',
+        'catalog_folder',
+        'catalog',
+        'catalogs',
+        'deleted_podcast_episodes',
+        'deleted_songs',
+        'deleted_videos',
+        'democratic',
+        'download',
+        'flag',
+        'followers',
+        'following',
+        'friends_timeline',
+        'genre_albums',
+        'genre_artists',
+        'genre_songs',
+        'genre',
+        'genres',
+        'get_art',
+        'get_bookmark',
+        'get_external_metadata',
+        'get_similar',
+        'goodbye',
+        'handshake',
+        'index',
+        'label_artists',
+        'label',
+        'labels',
+        'last_shouts',
+        'license_songs',
+        'license',
+        'licenses',
+        'list',
+        'live_stream_create',
+        'live_stream_delete',
+        'live_stream_edit',
+        'live_stream',
+        'live_streams',
+        'localplay_songs',
+        'localplay',
+        'lost_password',
+        'now_playing',
+        'ping',
+        'player',
+        'playlist_add',
+        'playlist_create',
+        'playlist_delete',
+        'playlist_edit',
+        'playlist_generate',
+        'playlist_hash',
+        'playlist_remove_song',
+        'playlist_songs',
+        'playlist',
+        'playlists',
+        'podcast_create',
+        'podcast_delete',
+        'podcast_edit',
+        'podcast_episode_delete',
+        'podcast_episode',
+        'podcast_episodes',
+        'podcast',
+        'podcasts',
+        'preference_create',
+        'preference_delete',
+        'preference_edit',
+        'rate',
+        'record_play',
+        'register',
+        'scrobble',
+        'search_group',
+        'search_rules',
+        'search_songs',
+        'search',
+        'share_create',
+        'share_delete',
+        'share_edit',
+        'share',
+        'shares',
+        'song_delete',
+        'song_tags',
+        'song',
+        'songs',
+        'stats',
+        'stream',
+        'system_preference',
+        'system_preferences',
+        'system_update',
+        'tag_albums',
+        'tag_artists',
+        'tag_songs',
+        'tag',
+        'tags',
+        'timeline',
+        'toggle_follow',
+        'update_art',
+        'update_artist_info',
+        'update_from_tags',
+        'update_podcast',
+        'url_to_song',
+        'user_create',
+        'user_delete',
+        'user_edit',
+        'user_playlists',
+        'user_preference',
+        'user_preferences',
+        'user_smartlists',
+        'user',
+        'users',
+        'video',
+        'videos',
+    ];
+
     // General Settings
     private string $username;
 
@@ -609,7 +741,10 @@ class AmpacheApi
                 break;
             case 6:
             default:
-                $this->handshake_version = self::API_VERSION;
+                $this->handshake_version = self::API6_VERSION;
+                break;
+            case 8:
+                $this->handshake_version = self::API8_VERSION;
         }
 
         if (isset($config['api_secure'])) {
@@ -783,6 +918,8 @@ class AmpacheApi
                 return in_array($command, self::API5_METHOD_LIST);
             case 6:
                 return in_array($command, self::API6_METHOD_LIST);
+            case 8:
+                return in_array($command, self::API8_METHOD_LIST);
         }
 
         return false;
