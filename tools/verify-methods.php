@@ -52,12 +52,13 @@ declare(strict_types=0);
  * Run it as a NON-ADMIN user: admin-only methods then answer 4742 Failed Access
  * Check, which still proves the method exists but runs none of it.
  *
- * LIMIT
+ * SCOPE
  *
- * This can only check the names the maps already carry. A method the server has
- * gained that this library has never heard of cannot be discovered this way --
- * that needs Ampache's own Api{3,4,5,6}::METHOD_LIST, which lives in the server
- * repository, not here.
+ * This checks the names the maps declare and nothing else. The maps are the
+ * library's contract: what it is willing to send is decided here, by hand, not
+ * learned from whatever a server happens to answer. Picking up a new method is a
+ * deliberate one line change, taken from Ampache's CHANGELOG-API.md. The job
+ * here is to confirm that contract is accurate, never to widen it.
  *
  * Usage:
  *   php tools/verify-methods.php [options]
