@@ -43,3 +43,48 @@ This version supports Ampache 6.2.0 and newer.
 * Passing a non-scalar value as a command option raised a `TypeError`
 * A `debug_callback` that cannot be called is now reported when it is set, rather than failing on the first debug message
 * A missing `server`, `username` or `password` raised an undefined key warning before the configuration check ran
+
+## AmpacheApi 1.0.3
+
+**NOTE** The 1.x releases shipped without notes, so the 1.x entries here were reconstructed from the git history after the fact.
+
+This release carries no functional change, only a comment recording that the handshake hashes a password it may already have received hashed.
+The ambiguity it noted is resolved in 2.0.0, which detects a sha256 password rather than assuming one.
+
+## AmpacheApi 1.0.2
+
+### Added (1.0.2)
+
+* `.php-cs-fixer.php`, so the code style is enforced rather than described
+
+### Changed (1.0.2)
+
+* The handshake hashes the password before combining it with the timestamp, sending `sha256(timestamp . sha256(password))`, so a plain password is what callers pass
+* `configure()` reaches the `READY` state on a `username` and a `server`; the password is no longer part of that check
+* `connect()` returns `true` on a successful handshake, where it previously returned nothing at all
+
+### Fixed (1.0.2)
+
+* Attributes arriving on a child element that had already been read as text replaced the first character of that text, turning `Some Title` into `Aome Title` alongside an illegal offset warning
+
+## AmpacheApi 1.0.1
+
+### Changed (1.0.1)
+
+* Relicensed from GPLv2 to AGPLv3
+
+### Fixed (1.0.1)
+
+* The class could not be autoloaded, because PSR-4 looks for `AmpacheApi.php` and the file was named `AmpacheApi.lib.php`
+* Every `throw` raised a "class not found" fatal in place of the exception it meant to report, because an unqualified `Exception` resolves inside the namespace the 1.0.0 packaging introduced
+
+## AmpacheApi 1.0.0
+
+First packaged release, extracted from Ampache's own tree.
+
+### Added (1.0.0)
+
+* `composer.json`, installable as `ampache/ampacheapi-php` with PSR-4 autoloading from `src/` and a PHP 5.4 floor
+* The `AmpacheApi` namespace
+* `user`, `users`, `shouts` and `timeline` are read as parent elements, so each one starts its own result entry instead of being folded into the element before it
+
