@@ -2,6 +2,27 @@
 
 declare(strict_types=0);
 
+/**
+ * vim:set softtabstop=4 shiftwidth=4 expandtab:
+ *
+ * LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0-or-later)
+ * Copyright Ampache.org, 2001-2026
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 namespace AmpacheApi\Tests;
 
 use AmpacheApi\AmpacheApi;
@@ -45,6 +66,14 @@ class AmpacheApiTest extends TestCase
         self::assertStringContainsString('&unique=0', $url);
     }
 
+    public function testCallerSuppliedVersionIsNotDuplicated(): void
+    {
+        $url = $this->configured(['server_version' => 6])->get_command_url('handshake', ['version' => '390001']);
+
+        self::assertSame(1, substr_count($url, 'version='));
+        self::assertStringContainsString('version=390001', $url);
+    }
+
     public function testCommandsUsedByTheRemoteCatalogAreValidOnBothLiveVersions(): void
     {
         $commands = ['album', 'artist', 'artists', 'download', 'ping', 'song', 'song_tags', 'songs', 'stream', 'url_to_song'];
@@ -66,6 +95,7 @@ class AmpacheApiTest extends TestCase
 
             return true;
         });
+        // @phpstan-ignore-next-line the config is deliberately incomplete, which is what this asserts
         $result = $api->configure(['username' => 'tester']);
         restore_error_handler();
 
@@ -79,6 +109,16 @@ class AmpacheApiTest extends TestCase
         self::assertSame(6, $this->readProperty($this->configured(), 'server_version'));
     }
 
+    /**
+     * PingMethod rewrites the session to Api::$version when a ping arrives without one, so every command carries its version.
+     */
+    public function testEveryCommandCarriesTheApiVersion(): void
+    {
+        $url = $this->configured(['server_version' => 6])->get_command_url('ping');
+
+        self::assertStringContainsString('&version=6.9.1', $url);
+    }
+
     public function testInfoRefusesToAnswerBeforeAHandshake(): void
     {
         $this->expectException(Exception::class);
@@ -90,6 +130,23 @@ class AmpacheApiTest extends TestCase
     public function testLastErrorIsEmptyBeforeAnythingIsSent(): void
     {
         self::assertNull($this->configured()->last_error());
+    }
+
+    public function testNonCallableDebugCallbackIsReportedRatherThanStored(): void
+    {
+        $raised = [];
+        set_error_handler(static function (int $number, string $message) use (&$raised): bool {
+            $raised[] = $message;
+
+            return true;
+        });
+
+        // the config is left incomplete so the constructor stops before it tries to connect
+        // @phpstan-ignore-next-line
+        new AmpacheApi(['username' => 'tester', 'password' => 'secret', 'debug_callback' => 'definitely_not_a_function']);
+        restore_error_handler();
+
+        self::assertNotEmpty(array_filter($raised, static fn(string $m): bool => strpos($m, 'not callable') !== false));
     }
 
     public function testNonScalarOptionIsRefusedWithAClearMessage(): void
@@ -206,21 +263,30 @@ class AmpacheApiTest extends TestCase
     private function configured(array $overrides = []): AmpacheApi
     {
         $api = (new ReflectionClass(AmpacheApi::class))->newInstanceWithoutConstructor();
-        $api->configure(array_merge([
+
+        /** @var array{username: string, password: string, server: string} $config */
+        $config = array_merge([
             'username' => 'tester',
             'password' => 'secret',
             'server' => 'music.example',
-        ], $overrides));
+        ], $overrides);
+        $api->configure($config);
 
         return $api;
     }
 
     /**
+     * Reads a private property, which is the only way to see the resolved version.
+     * @return int|string
      */
     private function readProperty(AmpacheApi $api, string $name)
     {
         $property = (new ReflectionClass(AmpacheApi::class))->getProperty($name);
-        $property->setAccessible(true);
+
+        // a no-op since 8.1 and deprecated in 8.5, but still required on the 7.4 floor
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true);
+        }
 
         return $property->getValue($api);
     }

@@ -3,6 +3,27 @@
 declare(strict_types=0);
 
 /**
+ * vim:set softtabstop=4 shiftwidth=4 expandtab:
+ *
+ * LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0-or-later)
+ * Copyright Ampache.org, 2001-2026
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
+/**
  * A stand-in for the parts of an Ampache server this library talks to.
  *
  * Only the dispatcher behaviour matters here: which http status carries which
@@ -71,8 +92,15 @@ switch ($action) {
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<error code=\"405\"><![CDATA[Invalid Request]]></error>\n</root>\n";
         break;
     case 'songs':
-        // api8 answers an empty result with a 404 and an empty root
+        // api8 answers an empty result with a 404, and in json that body is a falsy []
         http_response_code(404);
+        if ($json) {
+            header('Content-Type: application/json');
+            echo json_encode([], JSON_PRETTY_PRINT);
+
+            break;
+        }
+
         header('Content-Type: text/xml');
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n</root>\n";
         break;

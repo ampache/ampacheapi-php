@@ -1,0 +1,57 @@
+name: QA
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Code style and static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: xml, json
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Code style
+        run: composer cs:check
+
+      - name: Static analysis
+        run: composer stan
+
+  test:
+    name: Tests on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # composer.json declares php >=7.4, so every version it claims gets exercised
+        php: ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: xml, json
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Lint
+        run: find src tools tests examples -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+
+      - name: Tests
+        run: composer test

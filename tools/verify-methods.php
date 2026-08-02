@@ -6,8 +6,8 @@ declare(strict_types=0);
 /**
  * vim:set softtabstop=4 shiftwidth=4 expandtab:
  *
- * LICENSE: GNU Affero General Public License, version 3 (AGPLv3)
- * Copyright 2001 - 2015 Ampache.org
+ * LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0-or-later)
+ * Copyright Ampache.org, 2001-2026
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ declare(strict_types=0);
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,6 +43,18 @@ declare(strict_types=0);
  * a method handler, so "served" is established without the method doing its
  * work. Calls are made with no parameters, so anything that needs a `filter` or
  * an `id` answers 4710 Bad Request and stops there.
+ *
+ * WHAT IT WILL NOT CONCLUDE
+ *
+ * A version whose api_enable_N preference is off is rolled up to the next one
+ * the server does serve, which would otherwise read as every difference between
+ * the two being a map error. The handshake's reported version and a canary
+ * method from a later version both get checked first, and the version is
+ * reported unverified instead.
+ *
+ * api3 and api4 answer 405 for a missing parameter as well as for an unknown
+ * method, so a refusal there is reported inconclusive. Only the other direction,
+ * the server serving something the maps reject, is unambiguous on those.
  *
  * SAFETY
  *
@@ -95,6 +107,9 @@ const CODE_NOT_SERVED = [405, 4705];
 /** Dispatcher code for "this version has dropped that method" */
 const CODE_REMOVED = 4706;
 
+/** api3 and api4 answer 405 for a missing parameter as well as an unknown method, so a refusal there proves nothing */
+const AMBIGUOUS_REFUSAL_VERSIONS = [3, 4];
+
 /**
  * option
  *
@@ -141,8 +156,8 @@ function error_code(string $body, string $format): ?int
         $error = $data['error'];
 
         return isset($error['errorCode'])
-            ? (int)$error['errorCode']
-            : (isset($error['code']) ? (int)$error['code'] : null);
+            ? (int) $error['errorCode']
+            : (isset($error['code']) ? (int) $error['code'] : null);
     }
 
     $xml = @simplexml_load_string($body);
@@ -153,8 +168,50 @@ function error_code(string $body, string $format): ?int
     $attributes = $xml->error->attributes();
 
     return isset($attributes['errorCode'])
-        ? (int)$attributes['errorCode']
-        : (isset($attributes['code']) ? (int)$attributes['code'] : null);
+        ? (int) $attributes['errorCode']
+        : (isset($attributes['code']) ? (int) $attributes['code'] : null);
+}
+
+/**
+ * command_url
+ *
+ * Builds a bare command url, with limit=1 to keep list responses small.
+ *
+ * The version has to travel with every call: ping is a public action, and a public action carrying no version rewrites the session.
+ */
+function command_url(string $endpoint, string $method, string $auth, string $username, string $handshakeVersion): string
+{
+    return $endpoint . '?action=' . urlencode($method)
+        . '&auth=' . urlencode($auth)
+        . '&username=' . urlencode($username)
+        . '&version=' . urlencode($handshakeVersion)
+        . '&limit=1';
+}
+
+/**
+ * canary_for
+ *
+ * Picks a method belonging to a later api version than the one being checked, so serving it proves the server rolled the version up.
+ * @param string[] $methods
+ * @param array<string, int> $minimums
+ */
+function canary_for(int $version, array $methods, array $minimums): ?string
+{
+    $best    = null;
+    $highest = $version;
+    foreach ($methods as $method) {
+        if (isset(SKIP_METHODS[$method])) {
+            continue;
+        }
+
+        $minimum = $minimums[$method] ?? 0;
+        if ($minimum > $highest) {
+            $highest = $minimum;
+            $best    = $method;
+        }
+    }
+
+    return $best;
 }
 
 /**
@@ -167,7 +224,6 @@ function probe(string $url, int $timeout, string $format): string
 {
     $context = stream_context_create([
         'http' => ['timeout' => $timeout, 'ignore_errors' => true],
-        'https' => ['timeout' => $timeout, 'ignore_errors' => true],
     ]);
 
     $body = @file_get_contents($url, false, $context);
@@ -195,9 +251,9 @@ $host     = option('host', 'AMPACHE_HOST');
 $username = option('user', 'AMPACHE_USER');
 $password = option('password', 'AMPACHE_PASSWORD');
 $format   = option('format', 'AMPACHE_API_FORMAT', 'xml');
-$timeout  = (int)option('timeout', 'AMPACHE_TIMEOUT', '15');
+$timeout  = (int) option('timeout', 'AMPACHE_TIMEOUT', '15');
 $verbose  = flag('verbose');
-$versions = array_map('intval', explode(',', (string)option('versions', 'AMPACHE_API_VERSIONS', '6,8')));
+$versions = array_map('intval', explode(',', (string) option('versions', 'AMPACHE_API_VERSIONS', '6,8')));
 
 if (!$host || !$username || !$password) {
     fwrite(STDERR, "Set --host, --user and --password (or AMPACHE_HOST, AMPACHE_USER, AMPACHE_PASSWORD).\n");
@@ -210,18 +266,26 @@ if (!in_array($format, ['xml', 'json'], true)) {
 }
 
 $secure   = (strpos($host, 'https://') === 0);
-$bare     = preg_replace('#^https?://#', '', $host);
+$bare     = (string) preg_replace('#^https?://#', '', $host);
 $endpoint = ($secure ? 'https://' : 'http://') . rtrim($bare, '/') . '/server/' . $format . '.server.php';
 
 // the maps are private, which is right for the library and fine to read here
-$maps    = (new ReflectionClass(AmpacheApi::class))->getConstants();
-$methods = array_keys($maps['METHOD_MIN_VERSION']);
+$maps = (new ReflectionClass(AmpacheApi::class))->getConstants();
+
+/** @var array<string, int> $minimums */
+$minimums = $maps['METHOD_MIN_VERSION'];
+
+/** @var array<int, string> $handshakeVersions */
+$handshakeVersions = $maps['HANDSHAKE_VERSIONS'];
+
+$methods = array_map('strval', array_keys($minimums));
 sort($methods);
 
 printf("Ampache method map check\n  server  %s\n  format  %s\n  methods %d\n\n", $endpoint, $format, count($methods));
 
-$failures = 0;
-$skipped  = [];
+$failures   = 0;
+$skipped    = [];
+$unverified = [];
 
 foreach ($versions as $version) {
     $api = new AmpacheApi([
@@ -242,8 +306,8 @@ foreach ($versions as $version) {
 
     $handshake = $api->info();
     $auth      = ($format === 'json')
-        ? (is_array($handshake) && isset($handshake['auth']) ? (string)$handshake['auth'] : '')
-        : (($handshake instanceof SimpleXMLElement && !empty($handshake->auth)) ? (string)$handshake->auth : '');
+        ? (is_array($handshake) && isset($handshake['auth']) ? (string) $handshake['auth'] : '')
+        : (($handshake instanceof SimpleXMLElement && !empty($handshake->auth)) ? (string) $handshake->auth : '');
 
     if ($auth === '') {
         printf("api %d: connected but no auth token in the handshake, skipping\n\n", $version);
@@ -251,11 +315,46 @@ foreach ($versions as $version) {
         continue;
     }
 
+    /**
+     * The handshake reports the version the server settled on, which is not
+     * always the one asked for: an api_enable_N preference that is off makes
+     * ApiHandler roll the request up to the next version it does serve. Probing
+     * on regardless would report every difference between the two versions as a
+     * map disagreement, so this is reported as unverified instead.
+     */
+    $answered = ($format === 'json')
+        ? (int) substr((string) ($handshake['api'] ?? ''), 0, 1)
+        : (int) substr(($handshake instanceof SimpleXMLElement) ? (string) $handshake->api : '', 0, 1);
+
+    if ($answered > 0 && $answered !== $version) {
+        printf("api %d: server answered as api %d, so this version is not enabled here; not verified\n\n", $version, $answered);
+        $unverified[] = sprintf('api %d (handshake answered as api %d)', $version, $answered);
+        continue;
+    }
+
+    /**
+     * The handshake can be accepted at the requested version while commands are
+     * still served by a later one, because ApiHandler re-resolves the version
+     * per request and rolls it up past every api_enable_N that is switched off.
+     * Asking for a method this version does not have is the only way to tell.
+     */
+    $handshakeVersion = (string) ($handshakeVersions[$version] ?? '');
+    $canary           = canary_for($version, $methods, $minimums);
+    if ($canary !== null) {
+        $canaryResult = probe(command_url($endpoint, $canary, $auth, $username, $handshakeVersion), $timeout, $format);
+        if ($canaryResult === 'served') {
+            printf("api %d: server served '%s', which belongs to a later version, so it is not honouring api %d; not verified\n\n", $version, $canary, $version);
+            $unverified[] = sprintf("api %d (server served '%s', a later version's method)", $version, $canary);
+            continue;
+        }
+    }
+
     printf("api %d\n", $version);
 
-    $checked   = 0;
-    $mismatch  = 0;
-    $skipCount = 0;
+    $checked      = 0;
+    $mismatch     = 0;
+    $skipCount    = 0;
+    $inconclusive = 0;
 
     foreach ($methods as $method) {
         if (isset(SKIP_METHODS[$method])) {
@@ -265,12 +364,7 @@ foreach ($versions as $version) {
         }
 
         $expected = $api->validate_command($method);
-        $url      = $endpoint . '?action=' . urlencode($method)
-            . '&auth=' . urlencode($auth)
-            . '&username=' . urlencode($username)
-            . '&limit=1';
-
-        $result = probe($url, $timeout, $format);
+        $result   = probe(command_url($endpoint, $method, $auth, $username, $handshakeVersion), $timeout, $format);
         $checked++;
 
         if ($result === 'unreachable') {
@@ -287,6 +381,16 @@ foreach ($versions as $version) {
             continue;
         }
 
+        if (
+            $expected
+            && $result === 'not served'
+            && in_array($version, AMBIGUOUS_REFUSAL_VERSIONS, true)
+        ) {
+            $inconclusive++;
+            printf("  %-28s inconclusive: api%d reuses 405 for a missing parameter\n", $method, $version);
+            continue;
+        }
+
         $mismatch++;
         printf(
             "  %-28s MISMATCH: library says %s, server says %s\n",
@@ -296,7 +400,7 @@ foreach ($versions as $version) {
         );
     }
 
-    printf("  checked %d, skipped %d, mismatched %d\n\n", $checked, $skipCount, $mismatch);
+    printf("  checked %d, skipped %d, inconclusive %d, mismatched %d\n\n", $checked, $skipCount, $inconclusive, $mismatch);
     $failures += $mismatch;
 }
 
@@ -304,6 +408,14 @@ if ($skipped !== []) {
     printf("Not called, so not verified:\n");
     foreach ($skipped as $method => $reason) {
         printf("  %-28s %s\n", $method, $reason);
+    }
+    printf("\n");
+}
+
+if ($unverified !== []) {
+    printf("Versions this server would not serve:\n");
+    foreach ($unverified as $note) {
+        printf("  %s\n", $note);
     }
     printf("\n");
 }

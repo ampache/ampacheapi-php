@@ -16,7 +16,7 @@ $config  = [
     'server' => $server,
     'debug' => true,
     'debug_callback' => null,
-    'api_version' => 6,
+    'server_version' => 6,
     'api_format' => 'json',
 ];
 

@@ -29,7 +29,6 @@
     },
     "scripts": {
         "stan": "vendor/bin/phpstan analyse",
-        "stan-baseline": "vendor/bin/phpstan --generate-baseline",
         "cs:fix": "vendor/bin/php-cs-fixer fix",
         "cs:check": "vendor/bin/php-cs-fixer fix --dry-run -vv",
         "qa:methods": "php tools/verify-methods.php",
@@ -42,7 +41,6 @@
     },
     "scripts-descriptions": {
         "stan": "Performs static analysis",
-        "stan-baseline": "Regenerate phpstan baseline",
         "cs:fix": "Performs code-style corrections on the whole codebase",
         "cs:check": "Performs a code-style dry-run on the whole codebase",
         "qa:methods": "Checks the method version maps against a live Ampache server",

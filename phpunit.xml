@@ -5,7 +5,10 @@
          colors="true"
          failOnWarning="true"
          failOnRisky="true"
-         beStrictAboutOutputDuringTests="true">
+         beStrictAboutOutputDuringTests="true"
+         convertDeprecationsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true">
     <testsuites>
         <testsuite name="AmpacheApi">
             <directory>tests</directory>

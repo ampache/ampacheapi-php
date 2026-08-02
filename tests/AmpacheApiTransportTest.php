@@ -2,6 +2,27 @@
 
 declare(strict_types=0);
 
+/**
+ * vim:set softtabstop=4 shiftwidth=4 expandtab:
+ *
+ * LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0-or-later)
+ * Copyright Ampache.org, 2001-2026
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 namespace AmpacheApi\Tests;
 
 use AmpacheApi\AmpacheApi;
@@ -78,6 +99,7 @@ class AmpacheApiTransportTest extends TestCase
         self::assertInstanceOf(SimpleXMLElement::class, $result, 'the error body must not be discarded');
 
         $error = $api->last_error();
+        self::assertNotNull($error);
         self::assertSame($code, $error['code']);
         self::assertSame($message, $error['message']);
         self::assertSame($http, $error['http']);
@@ -95,6 +117,18 @@ class AmpacheApiTransportTest extends TestCase
         self::assertStringNotContainsString('SESSIONTOKEN', $logged);
         self::assertStringNotContainsString(hash('sha256', 'secret'), $logged);
         self::assertStringContainsString('auth=***', $logged);
+    }
+
+    /**
+     * Json8_Data::empty() answers json_encode([]), which is falsy, so decoding it cannot be a truthiness test.
+     */
+    public function testEmptyApi8JsonResultIsAResultRatherThanAFailure(): void
+    {
+        $api    = $this->connected(['api_format' => 'json']);
+        $result = $api->send_command('songs');
+
+        self::assertSame([], $result, 'an empty json result must survive the decode check');
+        self::assertNull($api->last_error());
     }
 
     public function testEmptyApi8ResultIsAResultRatherThanAFailure(): void
@@ -115,6 +149,7 @@ class AmpacheApiTransportTest extends TestCase
         self::assertSame('Not Found', (string) $result->error->errorMessage);
 
         $error = $api->last_error();
+        self::assertNotNull($error);
         self::assertSame(4704, $error['code']);
         self::assertSame('Not Found', $error['message']);
         self::assertSame(200, $error['http']);
@@ -145,6 +180,7 @@ class AmpacheApiTransportTest extends TestCase
         self::assertIsArray($result);
 
         $error = $api->last_error();
+        self::assertNotNull($error);
         self::assertSame(4704, $error['code']);
         self::assertSame('Not Found', $error['message']);
     }
@@ -165,6 +201,8 @@ class AmpacheApiTransportTest extends TestCase
         $api->send_command('video');
 
         $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertNotNull($error);
         self::assertSame(405, $error['code']);
         self::assertSame('Invalid Request', $error['message']);
     }
@@ -193,6 +231,7 @@ class AmpacheApiTransportTest extends TestCase
         self::assertSame('ERROR', $api->state());
 
         $error = $api->last_error();
+        self::assertNotNull($error);
         self::assertSame('transport', $error['type']);
         self::assertSame(0, $error['http']);
     }
@@ -202,7 +241,8 @@ class AmpacheApiTransportTest extends TestCase
      */
     private function connected(array $overrides = []): AmpacheApi
     {
-        return new AmpacheApi(array_merge([
+        /** @var array{username: string, password: string, server: string} $config */
+        $config = array_merge([
             'username' => 'tester',
             'password' => 'secret',
             'server' => 'http://' . self::$server->host(),
@@ -210,6 +250,8 @@ class AmpacheApiTransportTest extends TestCase
             'api_format' => 'xml',
             'server_version' => 8,
             'timeout' => 5,
-        ], $overrides));
+        ], $overrides);
+
+        return new AmpacheApi($config);
     }
 }

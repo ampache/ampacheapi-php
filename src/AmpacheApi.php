@@ -5,8 +5,8 @@ declare(strict_types=0);
 /**
  * vim:set softtabstop=4 shiftwidth=4 expandtab:
  *
- * LICENSE: GNU Affero General Public License, version 3 (AGPLv3)
- * Copyright 2001 - 2015 Ampache.org
+ * LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0-or-later)
+ * Copyright Ampache.org, 2001-2026
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ declare(strict_types=0);
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
 
@@ -233,7 +233,7 @@ class AmpacheApi
         'user_update' => 8,
     ];
 
-    /** @property callable|null $_debug_callback */
+    /** @var callable|null */
     private $_debug_callback = null;
 
     // Constructed variables
@@ -274,7 +274,7 @@ class AmpacheApi
      *   password: string,
      *   server: string,
      *   debug?: ?bool,
-     *   debug_callback?: string,
+     *   debug_callback?: callable|string,
      *   api_secure?: bool,
      *   api_format?: string,
      *   server_version?: int|string,
@@ -290,7 +290,12 @@ class AmpacheApi
         }
 
         if (isset($config['debug_callback'])) {
-            $this->_debug_callback = $config['debug_callback'];
+            // a string names a global function, so it is only callable once that function is loaded
+            if (is_callable($config['debug_callback'])) {
+                $this->_debug_callback = $config['debug_callback'];
+            } else {
+                trigger_error('AmpacheApi::__construct debug_callback is not callable, debug messages will not be forwarded');
+            }
         }
 
         $this->configure($config);
@@ -312,7 +317,7 @@ class AmpacheApi
      *   password: string,
      *   server: string,
      *   debug?: ?bool,
-     *   debug_callback?: string,
+     *   debug_callback?: callable|string,
      *   api_secure?: bool,
      *   api_format?: string,
      *   server_version?: int|string,
@@ -479,6 +484,11 @@ class AmpacheApi
 
                 $url .= '&' . urlencode($key) . '=' . urlencode((string) $value);
             }
+        }
+
+        // ping is a public action, and a public action carrying no version rewrites the session to whatever the server defaults to
+        if (!isset($options['version'])) {
+            $url .= '&version=' . urlencode($this->handshake_version);
         }
 
         // If auth is set then we append it so callers don't have to.
