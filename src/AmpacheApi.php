@@ -30,8 +30,6 @@ use SimpleXMLElement;
 
 class AmpacheApi
 {
-    private const LIB_VERSION = '2.0.0-develop';
-
     /**
      * The api versions this library can talk to.
      *
@@ -53,6 +51,7 @@ class AmpacheApi
         6 => '6.9.1',
         8 => '8.0.0',
     ];
+    private const LIB_VERSION = '2.0.0-develop';
 
     /**
      * The api version each method was introduced in.
@@ -234,12 +233,17 @@ class AmpacheApi
         'user_update' => 8,
     ];
 
-    // General Settings
-    private string $username;
+    /** @property callable|null $_debug_callback */
+    private $_debug_callback = null;
 
-    private string $password;
-
-    private bool $api_secure = true;
+    // Constructed variables
+    private bool $_debug_output = false;
+    private ?string $api_auth   = null;
+    private string $api_format  = 'xml'; // the version of API responses the client expects
+    private bool $api_secure    = true;
+    private string $api_state   = 'UNCONFIGURED';
+    private int $api_timeout    = 0; // seconds; 0 falls back to default_socket_timeout
+    private string $api_url;
 
     // Handshake variables
 
@@ -248,22 +252,16 @@ class AmpacheApi
 
     private string $handshake_version;
 
+    /** @var array{code: int, message: string, action: string, type: string, http: int}|null */
+    private ?array $last_error = null;
+
+    private string $password;
+
     // Response variables
     private int $server_version = self::DEFAULT_VERSION; // the version of API responses the client expects
 
-    private string $api_format = 'xml'; // the version of API responses the client expects
-
-    // Constructed variables
-    private bool $_debug_output = false;
-
-    /** @property callable|null $_debug_callback */
-    private $_debug_callback = null;
-
-    private ?string $api_auth = null;
-
-    private string $api_state = 'UNCONFIGURED';
-
-    private string $api_url;
+    // General Settings
+    private string $username;
 
     /**
      * Constructor
@@ -279,7 +277,8 @@ class AmpacheApi
      *   debug_callback?: string,
      *   api_secure?: bool,
      *   api_format?: string,
-     *   server_version?: int|string
+     *   server_version?: int|string,
+     *   timeout?: int|string
      * } $config
      * @throws Exception
      */
@@ -287,7 +286,7 @@ class AmpacheApi
     {
         // See if we are setting debug first
         if (isset($config['debug'])) {
-            $this->_debug_output = (bool)$config['debug'];
+            $this->_debug_output = (bool) $config['debug'];
         }
 
         if (isset($config['debug_callback'])) {
@@ -303,19 +302,80 @@ class AmpacheApi
     }
 
     /**
-     * _debug
+     * configure
      *
-     * Make debugging all nice and pretty.
+     * This function takes an array of elements and configures the AmpacheApi
+     * object. It doesn't really do anything fancy, but it's a separate function
+     * so it can be called both from the constructor and directly.
+     * @param array{
+     *   username: string,
+     *   password: string,
+     *   server: string,
+     *   debug?: ?bool,
+     *   debug_callback?: string,
+     *   api_secure?: bool,
+     *   api_format?: string,
+     *   server_version?: int|string,
+     *   timeout?: int|string
+     * } $config
      */
-    private function _debug(string $source, string $message): void
+    public function configure(array $config): bool
     {
-        if ($this->_debug_output) {
-            echo "$source :: $message\n";
+        //$this->_debug('CONFIGURE', 'Checking passed config options');
+
+        if (
+            empty($config['server'])
+            || empty($config['username'])
+            || empty($config['password'])
+        ) {
+            trigger_error('AmpacheApi::configure received invalid data, unable to configure');
+
+            return false;
         }
 
-        if (!is_null($this->_debug_callback)) {
-            call_user_func($this->_debug_callback, (self::class . '/' . self::LIB_VERSION), "$source :: $message", 5);
+        $this->username = $config['username'];
+        $this->password = $config['password'];
+
+        if (isset($config['server_version'])) {
+            // Ampache resolves the api version from the first character as well
+            $version = (int) substr((string) $config['server_version'], 0, 1);
+            if (!in_array($version, self::API_VERSIONS)) {
+                $this->_debug('CONFIGURE', 'Unknown api version ' . $version . ', falling back to ' . self::DEFAULT_VERSION);
+                $version = self::DEFAULT_VERSION;
+            }
+
+            $this->server_version = $version;
         }
+        if (isset($config['api_format']) && in_array($config['api_format'], ['xml', 'json'])) {
+            $this->api_format = $config['api_format'];
+        }
+
+        // set the handshake version string for the api version we're talking to
+        $this->handshake_version = self::HANDSHAKE_VERSIONS[$this->server_version];
+
+        if (isset($config['timeout'])) {
+            $this->api_timeout = max(0, (int) $config['timeout']);
+        }
+
+        if (isset($config['api_secure'])) {
+            // This should be a boolean response
+            $this->api_secure = (bool) $config['api_secure'];
+        }
+        $protocol = $this->api_secure
+            ? 'https://'
+            : 'http://';
+
+        // Strip whichever scheme the caller supplied; api_secure picks the one we use
+        $server        = (string) preg_replace('#^https?://#i', '', trim((string) $config['server']));
+        $server        = rtrim($server, '/');
+        $this->api_url = $protocol . $server . '/server/' . $this->api_format . '.server.php';
+
+        // See if we have enough to authenticate, if so change the state
+        if (!empty($this->username)) {
+            $this->set_state('READY');
+        }
+
+        return true;
     }
 
     /**
@@ -336,7 +396,7 @@ class AmpacheApi
 
         $passphrase = hash('sha256', $time . $key);
 
-        $this->_debug('CONNECT', "Using " . $this->username . " / " . $passphrase);
+        $this->_debug('CONNECT', "Authenticating " . $this->username);
 
         $options = [
             'timestamp' => $time,
@@ -358,7 +418,7 @@ class AmpacheApi
                 case 'xml':
                 default:
                     $auth = ($results instanceof SimpleXMLElement && !empty($results->auth))
-                        ? (string)$results->auth
+                        ? (string) $results->auth
                         : null;
             }
         }
@@ -378,71 +438,176 @@ class AmpacheApi
     }
 
     /**
-     * configure
+     * get_command_url
      *
-     * This function takes an array of elements and configures the AmpacheApi
-     * object. It doesn't really do anything fancy, but it's a separate function
-     * so it can be called both from the constructor and directly.
-     * @param array{
-     *   username: string,
-     *   password: string,
-     *   server: string,
-     *   debug?: ?bool,
-     *   debug_callback?: string,
-     *   api_secure?: bool,
-     *   api_format?: string,
-     *   server_version?: int|string
-     * } $config
+     * This builds and returns the command URL for the specified command and
+     * options.
+     * @param array<string, mixed> $options
+     * @throws Exception
      */
-    public function configure(array $config): bool
+    public function get_command_url(string $command, ?array $options = []): string
     {
-        //$this->_debug('CONFIGURE', 'Checking passed config options');
-
-        if (!$config['server'] || !$config['username'] || !$config['password']) {
-            trigger_error('AmpacheApi::configure received invalid data, unable to configure');
-
-            return false;
+        $command = trim($command);
+        if (!$command) {
+            throw new Exception('AmpacheApi::send_command no command specified');
+        }
+        if (!$this->validate_command($command)) {
+            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
         }
 
-        $this->username = $config['username'];
-        $this->password = $config['password'];
+        $url = $this->api_url . '?action=' . urlencode($command);
 
-        if (isset($config['server_version'])) {
-            // Ampache resolves the api version from the first character as well
-            $version = (int)substr((string)$config['server_version'], 0, 1);
-            if (!in_array($version, self::API_VERSIONS)) {
-                $this->_debug('CONFIGURE', 'Unknown api version ' . $version . ', falling back to ' . self::DEFAULT_VERSION);
-                $version = self::DEFAULT_VERSION;
+        if (is_array($options) && !empty($options)) {
+            foreach ($options as $key => $value) {
+                $key = trim((string) $key);
+                if (!$key) {
+                    // Nonfatal, don't need to throw an exception
+                    trigger_error('AmpacheApi::get_command_url unable to append empty variable to command');
+                    continue;
+                }
+                if ($value === null) {
+                    // an option that wasn't set is not the same as an empty one
+                    continue;
+                }
+                if (is_bool($value)) {
+                    // Ampache reads flags as 0 or 1, not as '' and '1'
+                    $value = $value ? '1' : '0';
+                }
+                if (!is_scalar($value)) {
+                    throw new Exception('AmpacheApi::get_command_url option ' . $key . ' must be a scalar value');
+                }
+
+                $url .= '&' . urlencode($key) . '=' . urlencode((string) $value);
             }
-
-            $this->server_version = $version;
-        }
-        if (isset($config['api_format']) && in_array($config['api_format'], ['xml', 'json'])) {
-            $this->api_format = $config['api_format'];
         }
 
-        // set the handshake version string for the api version we're talking to
-        $this->handshake_version = self::HANDSHAKE_VERSIONS[$this->server_version];
-
-        if (isset($config['api_secure'])) {
-            // This should be a boolean response
-            $this->api_secure = (bool)$config['api_secure'];
-        }
-        $protocol = $this->api_secure
-            ? 'https://'
-            : 'http://';
-
-        // Replace any http:// in the URL with ''
-        $config['server'] = str_replace($protocol, '', $config['server']);
-        $server           = htmlentities($config['server'], ENT_QUOTES, 'UTF-8');
-        $this->api_url    = $protocol . $server . '/server/' . $this->api_format . '.server.php';
-
-        // See if we have enough to authenticate, if so change the state
-        if (!empty($this->username)) {
-            $this->set_state('READY');
+        // If auth is set then we append it so callers don't have to.
+        if ($this->api_auth) {
+            $url .= '&auth=' . urlencode($this->api_auth) . '&username=' . urlencode($this->username);
         }
 
-        return true;
+        return $url;
+    }
+
+    /**
+     * info
+     *
+     * Returns the information gathered by the handshake.
+     * Not raw so we can format it if we want?
+     * @return array<string, mixed>|SimpleXMLElement|null
+     * @throws Exception
+     */
+    public function info()
+    {
+        if ($this->state() != 'CONNECTED') {
+            throw new Exception('AmpacheApi::info API in non-ready state, unable to return info');
+        }
+
+        return $this->handshake;
+    }
+
+    /**
+     * last_error
+     *
+     * The error from the most recent send_command, or null when it worked; a 'type' of 'transport' means no readable answer arrived.
+     * @return array{code: int, message: string, action: string, type: string, http: int}|null
+     */
+    public function last_error(): ?array
+    {
+        return $this->last_error;
+    }
+
+    /**
+     * send_command
+     *
+     * This sends an API command with options to the currently connected
+     * host.
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>|SimpleXMLElement|null
+     * @throws Exception
+     */
+    public function send_command(string $command, ?array $options = [])
+    {
+        $this->last_error = null;
+        $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
+
+        if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
+            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
+        }
+        $command = trim($command);
+        if (!$command) {
+            throw new Exception('AmpacheApi::send_command no command specified');
+        }
+        if (!$this->validate_command($command)) {
+            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
+        }
+
+        $url = $this->get_command_url($command, $options);
+
+        $this->_debug('COMMAND URL', $url);
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => ($this->api_timeout > 0)
+                    ? $this->api_timeout
+                    : (int) ini_get('default_socket_timeout'),
+                // api8 answers errors with a real http status, so without this the error body is discarded and we see only a failed read
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        // file_get_contents fills this in, but only once it has an http response to report
+        $http_response_header = [];
+
+        // warnings are suppressed deliberately: they quote the url, auth token and all
+        $data   = @file_get_contents($url, false, $context);
+        $status = $this->_response_status($http_response_header);
+
+        if ($data === false || $data === '') {
+            $this->last_error = [
+                'code' => 0,
+                'message' => ($status > 0)
+                    ? 'Server answered HTTP ' . $status . ' with no body'
+                    : 'No response from server',
+                'action' => $command,
+                'type' => 'transport',
+                'http' => $status,
+            ];
+            $this->_debug('NO RESPONSE', $command . ' (http ' . $status . ')');
+
+            return null;
+        }
+
+        $result = null;
+        switch ($this->api_format) {
+            case 'json':
+                $result = json_decode($data, true);
+                break;
+            case 'xml':
+                $result = simplexml_load_string($data);
+        }
+
+        // Only a decode failure counts as no answer, and an empty api8 result is falsy, so this cannot be a truthiness test
+        if ($result === null || $result === false) {
+            $this->last_error = [
+                'code' => 0,
+                'message' => 'Unreadable ' . $this->api_format . ' response',
+                'action' => $command,
+                'type' => 'transport',
+                'http' => $status,
+            ];
+            $this->_debug('EMPTY RESPONSE', $command);
+
+            return null;
+        }
+
+        // An api error is handed back decoded, as api3 to api6 always have, and last_error() carries the message for anyone who wants it
+        $this->last_error = $this->_parse_error($result, $command, $status);
+        if ($this->last_error !== null) {
+            $this->_debug('API ERROR', $command . ' ' . $this->last_error['code'] . ' ' . $this->last_error['message']);
+        }
+
+        return $result;
     }
 
     /**
@@ -469,115 +634,6 @@ class AmpacheApi
     }
 
     /**
-     * info
-     *
-     * Returns the information gathered by the handshake.
-     * Not raw so we can format it if we want?
-     * @return array<string, mixed>|SimpleXMLElement|null
-     * @throws Exception
-     */
-    public function info()
-    {
-        if ($this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::info API in non-ready state, unable to return info');
-        }
-
-        return $this->handshake;
-    }
-
-    /**
-     * get_command_url
-     *
-     * This builds and returns the command URL for the specified command and
-     * options.
-     * @param array<string, mixed> $options
-     * @return string
-     * @throws Exception
-     */
-    public function get_command_url(string $command, ?array $options = []): string
-    {
-        $command = trim($command);
-        if (!$command) {
-            throw new Exception('AmpacheApi::send_command no command specified');
-        }
-        if (!$this->validate_command($command)) {
-            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
-        }
-
-        $url = $this->api_url . '?action=' . urlencode($command);
-
-        if (is_array($options) && !empty($options)) {
-            foreach ($options as $key => $value) {
-                $key = trim($key);
-                if (!$key) {
-                    // Nonfatal, don't need to throw an exception
-                    trigger_error('AmpacheApi::send_command unable to append empty variable to command');
-                    continue;
-                }
-                $url .= '&' . urlencode($key) . '=' . urlencode($value);
-            }
-        }
-
-        // If auth is set then we append it so callers don't have to.
-        if ($this->api_auth) {
-            $url .= '&auth=' . urlencode($this->api_auth) . '&username=' . urlencode($this->username);
-        }
-
-        return $url;
-    }
-
-    /**
-     * send_command
-     *
-     * This sends an API command with options to the currently connected
-     * host.
-     * @param array<string, mixed> $options
-     * @return array<string, mixed>|SimpleXMLElement|null
-     * @throws Exception
-     */
-    public function send_command(string $command, ?array $options = [])
-    {
-        $this->_debug('SEND COMMAND', $command . ' ' . json_encode($options));
-
-        if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
-            throw new Exception('AmpacheApi::send_command API in non-ready state, unable to send');
-        }
-        $command = trim($command);
-        if (!$command) {
-            throw new Exception('AmpacheApi::send_command no command specified');
-        }
-        if (!$this->validate_command($command)) {
-            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
-        }
-
-        $url = $this->get_command_url($command, $options);
-
-        $this->_debug('COMMAND URL', $url);
-
-        $data = file_get_contents($url);
-        if (!$data) {
-            return null;
-        }
-
-        $result = null;
-        switch ($this->api_format) {
-            case 'json':
-                $result = json_decode($data, true);
-                break;
-            case 'xml':
-                $result = simplexml_load_string($data);
-        }
-
-        if (!$result) {
-            $this->_debug('EMPTY RESPONSE', $command);
-
-            return null;
-        }
-
-        return $result;
-    }
-
-    /**
      * validate_command
      *
      * This takes the specified command and checks that the configured version
@@ -588,8 +644,8 @@ class AmpacheApi
     {
         $minimum = self::METHOD_MIN_VERSION[$command] ?? null;
         if (
-            $minimum === null ||
-            $this->server_version < $minimum
+            $minimum === null
+            || $this->server_version < $minimum
         ) {
             return false;
         }
@@ -597,8 +653,109 @@ class AmpacheApi
         $removed = self::METHOD_REMOVED_IN[$command] ?? null;
 
         return (
-            $removed === null ||
-            $this->server_version < $removed
+            $removed === null
+            || $this->server_version < $removed
         );
+    }
+
+    /**
+     * _debug
+     *
+     * Make debugging all nice and pretty.
+     */
+    private function _debug(string $source, string $message): void
+    {
+        $message = $this->_redact($message);
+
+        if ($this->_debug_output) {
+            echo "$source :: $message\n";
+        }
+
+        if (!is_null($this->_debug_callback)) {
+            call_user_func($this->_debug_callback, (self::class . '/' . self::LIB_VERSION), "$source :: $message", 5);
+        }
+    }
+
+    /**
+     * _parse_error
+     *
+     * Pulls an api error out of a decoded response, handling both the api3/api4 <error code=""> shape and the api5+ errorMessage one.
+     * @param array<string, mixed>|SimpleXMLElement $result
+     * @return array{code: int, message: string, action: string, type: string, http: int}|null
+     */
+    private function _parse_error($result, string $command, int $status): ?array
+    {
+        if ($result instanceof SimpleXMLElement) {
+            if (!isset($result->error)) {
+                return null;
+            }
+
+            $attributes = $result->error->attributes();
+            $code       = (isset($attributes['errorCode']))
+                ? (int) $attributes['errorCode']
+                : (int) ($attributes['code'] ?? 0);
+
+            return [
+                'code' => $code,
+                'message' => (isset($result->error->errorMessage))
+                    ? (string) $result->error->errorMessage
+                    : trim((string) $result->error),
+                'action' => (isset($result->error->errorAction))
+                    ? (string) $result->error->errorAction
+                    : $command,
+                'type' => (string) ($result->error->errorType ?? ''),
+                'http' => $status,
+            ];
+        }
+
+        if (
+            !is_array($result)
+            || !isset($result['error'])
+            || !is_array($result['error'])
+        ) {
+            return null;
+        }
+
+        $error = $result['error'];
+
+        return [
+            'code' => (int) ($error['errorCode'] ?? $error['code'] ?? 0),
+            'message' => (string) ($error['errorMessage'] ?? $error['message'] ?? ''),
+            'action' => (string) ($error['errorAction'] ?? $command),
+            'type' => (string) ($error['errorType'] ?? ''),
+            'http' => $status,
+        ];
+    }
+
+    /**
+     * _redact
+     *
+     * Removes credentials from a debug message, because debug_callback fires whether or not debug output is switched on.
+     */
+    private function _redact(string $message): string
+    {
+        // auth=<token> and friends in a url or query string
+        $message = (string) preg_replace('/([?&](?:auth|ssid|api_key|passphrase)=)[^&\s]*/i', '${1}***', $message);
+
+        // the same values inside the json blob we log for send_command options
+        return (string) preg_replace('/("(?:auth|passphrase)"\s*:\s*)"[^"]*"/i', '${1}"***"', $message);
+    }
+
+    /**
+     * _response_status
+     *
+     * Reads the http status from the headers file_get_contents leaves behind, taking the last so a redirect reports its final hop.
+     * @param string[] $headers
+     */
+    private function _response_status(array $headers): int
+    {
+        $status = 0;
+        foreach ($headers as $header) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#i', $header, $matches) === 1) {
+                $status = (int) $matches[1];
+            }
+        }
+
+        return $status;
     }
 }
