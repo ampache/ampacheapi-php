@@ -14,13 +14,25 @@ This version supports Ampache 6.2.0 and newer.
   * `api_format` selects `xml` or `json` responses
   * `server_version` selects the api version to talk to, defaulting to 6
   * `timeout` sets the per-request timeout in seconds
-  * `api_secure` selects `https` or `http`
 
 ### Changed (2.0.0)
 
 * `send_command()` returns a `SimpleXMLElement` or a decoded json array as the server sent it, replacing the structure 1.x assembled
 * Commands are checked against the api version in use, so a method that version does not serve is refused before the request is sent
 * `tag`, `tags`, `tag_albums`, `tag_artists` and `tag_songs` are refused from API5 onwards, and `get_indexes`, `playlist_add_song` and `user_update` from API8, matching the versions that dropped them
+* `api_secure` is consulted only when it is passed; otherwise the scheme on `server` selects `https` or `http`, and `https` remains the fallback when neither says
+* `__construct()` requires a config array, where 1.x defaulted it to an empty one
+* `debug_callback` receives `AmpacheApi\AmpacheApi/<version>` as its first argument in place of the bare `AmpacheApi` 1.x sent
+
+### Removed (2.0.0)
+
+* The public methods 1.x used to assemble its own response structure, made redundant by `send_command()` handing back the decoded response
+  * `parse_response()`
+  * `get_response()`
+  * `XML_create_parser()`
+  * `XML_cdata()`
+  * `XML_start_element()`
+  * `XML_end_element()`
 
 ### Fixed (2.0.0)
 

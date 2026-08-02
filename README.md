@@ -4,13 +4,13 @@ Ampache API PHP Library.
 
 ## NEWS
 
-Version 2 of this library is underway.
+Version 2 is out, and it is not a drop-in replacement for 1.x.
 
-There are major changes to help support multiple purposes as well as both XML and JSON responses.
-
-The library will now return a SimpleXMLElement or a decoded JSON array instead of the frankenstein.
+`send_command()` returns a SimpleXMLElement or a decoded JSON array exactly as the server sent it, instead of the structure 1.x assembled, so `last_error()` is now how you tell a successful call from a failed one.
 
 This version of the library is supported from Ampache 6.2.0+ and talks to API versions 3, 4, 5, 6 and 8. (Ampache has no API 7.)
+
+See the [CHANGELOG](CHANGELOG.md) for everything that moved.
 
 ## License
 
@@ -25,11 +25,11 @@ When creating an AmpacheApi object config is set using a config array.
 * Required
   * username: string - Your API username
   * password: string - Your API password, plain or already sha256 hashed
-  * server: string - Server address; an `http://` or `https://` prefix is stripped, and `api_secure` decides which is used
+  * server: string - Server address, with or without an `http://` or `https://` prefix
 * Optional
   * debug: bool - Enable debug mode which will echo debug messages (default: false)
   * debug_callback: callable - Function that receives debug messages; it is called whether or not `debug` is on (default: null)
-  * api_secure: bool - Set to false to use http (default: true)
+  * api_secure: bool - Set to false to use http; when omitted, a scheme on `server` decides and https is the fallback
   * api_format: string - Set API response format. xml, json (default: xml)
   * server_version: int - Set API response version. 3, 4, 5, 6, 8 (default: 6)
   * timeout: int - Per request timeout in seconds (default: PHP's `default_socket_timeout`)

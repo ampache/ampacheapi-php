@@ -172,11 +172,23 @@ class AmpacheApiTest extends TestCase
         self::assertStringContainsString('&rule_1_input=a+b%26c', $url);
     }
 
+    public function testSchemeInTheServerAddressDecidesWhenApiSecureIsNotAsked(): void
+    {
+        $api = $this->configured(['server' => 'http://localhost:8080']);
+
+        self::assertStringStartsWith('http://localhost:8080/server/', $api->get_command_url('ping'));
+    }
+
     public function testSchemeInTheServerAddressIsReplacedByTheOneApiSecureAsksFor(): void
     {
         $api = $this->configured(['server' => 'http://music.example', 'api_secure' => true]);
 
         self::assertStringStartsWith('https://music.example/server/', $api->get_command_url('ping'));
+    }
+
+    public function testSchemelessAddressStaysOnHttps(): void
+    {
+        self::assertStringStartsWith('https://music.example/server/', $this->configured()->get_command_url('ping'));
     }
 
     public function testStartsUnconfiguredAndBecomesReady(): void
@@ -208,6 +220,14 @@ class AmpacheApiTest extends TestCase
         $this->expectExceptionMessage('Invalid/Unknown command');
 
         $this->configured()->get_command_url('not_a_method');
+    }
+
+    public function testUrlCannotBeBuiltBeforeTheClientIsConfigured(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('non-ready state');
+
+        (new ReflectionClass(AmpacheApi::class))->newInstanceWithoutConstructor()->get_command_url('ping');
     }
 
     public function testUrlUsesTheFormatAsTheEndpoint(): void

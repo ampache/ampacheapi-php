@@ -51,7 +51,7 @@ class AmpacheApi
         6 => '6.9.1',
         8 => '8.0.0',
     ];
-    private const LIB_VERSION = '2.0.0-develop';
+    private const LIB_VERSION = '2.0.0';
 
     /**
      * The api version each method was introduced in.
@@ -362,17 +362,24 @@ class AmpacheApi
             $this->api_timeout = max(0, (int) $config['timeout']);
         }
 
+        $server = trim((string) $config['server']);
+        $scheme = (preg_match('#^(https?)://#i', $server, $matches) === 1)
+            ? strtolower($matches[1])
+            : '';
+
         if (isset($config['api_secure'])) {
             // This should be a boolean response
             $this->api_secure = (bool) $config['api_secure'];
+        } elseif ($scheme !== '') {
+            // nothing was asked for, so an address that names its scheme is the only instruction we have
+            $this->api_secure = ($scheme === 'https');
         }
         $protocol = $this->api_secure
             ? 'https://'
             : 'http://';
 
         // Strip whichever scheme the caller supplied; api_secure picks the one we use
-        $server        = (string) preg_replace('#^https?://#i', '', trim((string) $config['server']));
-        $server        = rtrim($server, '/');
+        $server        = rtrim((string) preg_replace('#^https?://#i', '', $server), '/');
         $this->api_url = $protocol . $server . '/server/' . $this->api_format . '.server.php';
 
         // See if we have enough to authenticate, if so change the state
@@ -452,12 +459,15 @@ class AmpacheApi
      */
     public function get_command_url(string $command, ?array $options = []): string
     {
+        if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
+            throw new Exception('AmpacheApi::get_command_url API in non-ready state, unable to build a url');
+        }
         $command = trim($command);
         if (!$command) {
-            throw new Exception('AmpacheApi::send_command no command specified');
+            throw new Exception('AmpacheApi::get_command_url no command specified');
         }
         if (!$this->validate_command($command)) {
-            throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
+            throw new Exception('AmpacheApi::get_command_url Invalid/Unknown command ' . $command . ' issued');
         }
 
         $url = $this->api_url . '?action=' . urlencode($command);
