@@ -3,6 +3,7 @@
 $finder = PhpCsFixer\Finder::create()
     ->exclude(['vendor', 'nbproject', '.idea'])
     ->in('src/')
+    ->in('tests/')
 ;
 
 return (new PhpCsFixer\Config())

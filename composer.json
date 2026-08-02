@@ -6,6 +6,7 @@
     "homepage": "https://github.com/ampache/ampacheapi-php",
     "license": "AGPL-3.0-only",
     "minimum-stability": "dev",
+    "prefer-stable": true,
     "require": {
         "php": ">=7.4.0",
         "ext-xml": "*",
@@ -13,11 +14,17 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.49",
-        "phpstan/phpstan": "^1.10"
+        "phpstan/phpstan": "^1.10",
+        "phpunit/phpunit": "^9.6"
     },
     "autoload": {
         "psr-4": {
             "AmpacheApi\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AmpacheApi\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -25,13 +32,21 @@
         "stan-baseline": "vendor/bin/phpstan --generate-baseline",
         "cs:fix": "vendor/bin/php-cs-fixer fix",
         "cs:check": "vendor/bin/php-cs-fixer fix --dry-run -vv",
-        "qa:methods": "php tools/verify-methods.php"
+        "qa:methods": "php tools/verify-methods.php",
+        "test": "vendor/bin/phpunit",
+        "qa": [
+            "@cs:check",
+            "@stan",
+            "@test"
+        ]
     },
     "scripts-descriptions": {
         "stan": "Performs static analysis",
         "stan-baseline": "Regenerate phpstan baseline",
         "cs:fix": "Performs code-style corrections on the whole codebase",
         "cs:check": "Performs a code-style dry-run on the whole codebase",
-        "qa:methods": "Checks the method version maps against a live Ampache server"
+        "qa:methods": "Checks the method version maps against a live Ampache server",
+        "test": "Runs the test suite",
+        "qa": "The pre-PR gate: code style, static analysis and tests"
     }
 }
