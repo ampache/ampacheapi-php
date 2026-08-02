@@ -8,6 +8,18 @@ $finder = PhpCsFixer\Finder::create()
 return (new PhpCsFixer\Config())
     ->setRules([
         '@PSR12' => true,
+        '@PER-CS3x0' => true,
+        'no_useless_else' => true,
+        'no_useless_return' => true,
+        'simplified_if_return' => true,
+        'no_superfluous_phpdoc_tags' => true,
+        'single_class_element_per_statement' => true,
+        'class_attributes_separation' => [
+            'elements' => [
+                'property' => 'none',
+                'method' => 'one'
+            ]
+        ],
         'array_syntax' => [
             'syntax' => 'short'
         ],
@@ -36,7 +48,13 @@ return (new PhpCsFixer\Config())
         'full_opening_tag' => true,
         'line_ending' => true,
         'lowercase_cast' => true,
-        'method_argument_space' => true,
+        'method_argument_space' => [
+            'on_multiline' => 'ensure_fully_multiline',
+            'keep_multiple_spaces_after_comma' => false,
+        ],
+        'trailing_comma_in_multiline' => [
+            'elements' => ['parameters'],
+        ],
         'multiline_comment_opening_closing' => true,
         'no_break_comment' => false,
         'no_trailing_whitespace' => true,
@@ -47,8 +65,38 @@ return (new PhpCsFixer\Config())
         ],
         'single_blank_line_at_eof' => true,
         'strict_param' => false,
-        'visibility_required' => true,
+        'modifier_keywords' => [
+            'elements' => ['const', 'method', 'property']
+        ],
         'no_unused_imports' => true,
+        'ordered_imports' => [
+            'sort_algorithm' => 'alpha'
+        ],
+        'ternary_operator_spaces' => true,
+        'ordered_class_elements' => [
+            'order' => [
+                'use_trait',
+                'case',
+                'constant_public',
+                'constant_protected',
+                'constant_private',
+                'property_public_static',
+                'property_protected_static',
+                'property_private_static',
+                'property_public',
+                'property_protected',
+                'property_private',
+                'construct',
+                'method_public_static',
+                'method_protected_static',
+                'method_private_static',
+                'method_public',
+                'method_protected',
+                'method_private',
+                'magic',
+            ],
+            'sort_algorithm' => 'alpha',
+        ]
     ])
     ->setIndent("    ")
     ->setFinder($finder)
