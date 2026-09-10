@@ -51,8 +51,8 @@ final class StubServer
         $this->port  = $this->freePort();
         $descriptors = [
             0 => ['pipe', 'r'],
-            1 => ['file', '/dev/null', 'w'],
-            2 => ['file', '/dev/null', 'w'],
+            1 => ['file', (DIRECTORY_SEPARATOR === '\\') ? 'NUL' : '/dev/null', 'w'],
+            2 => ['file', (DIRECTORY_SEPARATOR === '\\') ? 'NUL' : '/dev/null', 'w'],
         ];
 
         $process = proc_open(

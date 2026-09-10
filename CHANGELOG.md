@@ -1,5 +1,15 @@
 # Changelog
 
+## AmpacheApi 2.1.0
+
+### Added (2.1.0)
+
+* `url_validator` config option: a callable that decides whether a url may be requested, checked before the initial request and again before every redirect hop is followed
+
+### Fixed (2.1.0)
+
+* `send_command()` followed a `Location` redirect to any address the server answered with, including one a caller's `url_validator` would have refused for the original request; redirects are now followed one hop at a time so each one is checked
+
 ## AmpacheApi 2.0.0
 
 **NOTE** `send_command()` no longer normalises responses; it hands back what the server sent, so callers written against 1.x need updating.

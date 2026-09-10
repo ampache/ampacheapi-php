@@ -34,6 +34,20 @@ declare(strict_types=0);
 $action = $_GET['action'] ?? '';
 $json   = (strpos($_SERVER['SCRIPT_NAME'] ?? '', 'json.server.php') !== false);
 
+// answers any command with a redirect instead of its normal response, so a test can drive the client's
+// redirect-following without a second stub server to redirect to; 'loop' redirects to the exact same
+// request forever, for a test that wants a redirect chain that never resolves
+if (isset($_GET['redirect_to'])) {
+    $target = ($_GET['redirect_to'] === 'loop')
+        ? ($_SERVER['REQUEST_URI'] ?? '')
+        : $_GET['redirect_to'];
+
+    http_response_code(302);
+    header('Location: ' . $target);
+
+    exit;
+}
+
 /**
  * Writes an error in the api5+ shape, under the http status api8 would use.
  */

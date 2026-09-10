@@ -61,6 +61,13 @@ class AmpacheApiTransportTest extends TestCase
         self::$server->stop();
     }
 
+    private static function hostAndPort(string $url): string
+    {
+        $parts = parse_url($url);
+
+        return ($parts['host'] ?? '') . ':' . ($parts['port'] ?? '');
+    }
+
     /**
      * @return array<string, array{0: string, 1: int, 2: int, 3: string}>
      */
@@ -217,6 +224,22 @@ class AmpacheApiTransportTest extends TestCase
         self::assertNull($api->last_error());
     }
 
+    /**
+     * The stub always redirects to itself, so a validator that approves everything still has to give up eventually.
+     */
+    public function testTooManyRedirectsIsReportedAsATransportError(): void
+    {
+        $api    = $this->connected(['url_validator' => static fn(): bool => true]);
+        $result = $api->send_command('artists', ['redirect_to' => 'loop']);
+
+        self::assertNull($result);
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame('transport', $error['type']);
+        self::assertSame('Too many redirects', $error['message']);
+    }
+
     public function testUnreachableServerReportsATransportError(): void
     {
         $api = new AmpacheApi([
@@ -234,6 +257,52 @@ class AmpacheApiTransportTest extends TestCase
         self::assertNotNull($error);
         self::assertSame('transport', $error['type']);
         self::assertSame(0, $error['http']);
+    }
+
+    /**
+     * A redirect that still lands on the configured server is exactly what a legitimate api response looks like.
+     */
+    public function testUrlValidatorAllowsARedirectToAnApprovedHost(): void
+    {
+        $host = self::$server->host();
+        $api  = $this->connected(['url_validator' => static fn(string $url): bool => self::hostAndPort($url) === $host]);
+
+        $result = $api->send_command('artists', ['redirect_to' => 'http://' . $host . '/?action=artists']);
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+        self::assertSame('Tester', (string) $result->artist->name);
+        self::assertNull($api->last_error());
+    }
+
+    /**
+     * Only the initial connect is checked without this: a server that starts out approved could still redirect
+     * a later command anywhere once it is trusted, which is the bypass this library must not reintroduce.
+     */
+    public function testUrlValidatorRefusesARedirectToAnUnapprovedHost(): void
+    {
+        $host = self::$server->host();
+        $api  = $this->connected(['url_validator' => static fn(string $url): bool => self::hostAndPort($url) === $host]);
+
+        $result = $api->send_command('artists', ['redirect_to' => 'http://192.0.2.1/evil']);
+
+        self::assertNull($result);
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame('transport', $error['type']);
+        self::assertSame('Destination refused by url_validator', $error['message']);
+    }
+
+    public function testUrlValidatorRefusesTheHandshake(): void
+    {
+        $api = $this->connected(['url_validator' => static fn(): bool => false]);
+
+        self::assertSame('ERROR', $api->state());
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame('transport', $error['type']);
+        self::assertSame('Destination refused by url_validator', $error['message']);
     }
 
     /**

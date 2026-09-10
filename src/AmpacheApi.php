@@ -51,7 +51,10 @@ class AmpacheApi
         6 => '6.9.1',
         8 => '8.0.0',
     ];
-    private const LIB_VERSION = '2.0.0';
+    private const LIB_VERSION = '2.1.0';
+
+    /** How many redirects a command will follow when a url_validator is configured, each one checked before it is followed */
+    private const MAX_REDIRECTS = 10;
 
     /**
      * The api version each method was introduced in.
@@ -260,6 +263,9 @@ class AmpacheApi
     // Response variables
     private int $server_version = self::DEFAULT_VERSION; // the version of API responses the client expects
 
+    /** @var callable|null decides whether a url (the initial request and every redirect hop) may be requested */
+    private $url_validator = null;
+
     // General Settings
     private string $username;
 
@@ -278,7 +284,8 @@ class AmpacheApi
      *   api_secure?: bool,
      *   api_format?: string,
      *   server_version?: int|string,
-     *   timeout?: int|string
+     *   timeout?: int|string,
+     *   url_validator?: callable|string|null
      * } $config
      * @throws Exception
      */
@@ -295,6 +302,14 @@ class AmpacheApi
                 $this->_debug_callback = $config['debug_callback'];
             } else {
                 trigger_error('AmpacheApi::__construct debug_callback is not callable, debug messages will not be forwarded');
+            }
+        }
+
+        if (isset($config['url_validator'])) {
+            if (is_callable($config['url_validator'])) {
+                $this->url_validator = $config['url_validator'];
+            } else {
+                trigger_error('AmpacheApi::__construct url_validator is not callable, no destination policy will be enforced');
             }
         }
 
@@ -321,7 +336,8 @@ class AmpacheApi
      *   api_secure?: bool,
      *   api_format?: string,
      *   server_version?: int|string,
-     *   timeout?: int|string
+     *   timeout?: int|string,
+     *   url_validator?: callable|string|null
      * } $config
      */
     public function configure(array $config): bool
@@ -566,68 +582,90 @@ class AmpacheApi
 
         $this->_debug('COMMAND URL', $url);
 
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => ($this->api_timeout > 0)
-                    ? $this->api_timeout
-                    : (int) ini_get('default_socket_timeout'),
-                // api8 answers errors with a real http status, so without this the error body is discarded and we see only a failed read
-                'ignore_errors' => true,
-            ],
-        ]);
+        for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
+            if ($this->url_validator !== null && !call_user_func($this->url_validator, $url)) {
+                $this->last_error = [
+                    'code' => 0,
+                    'message' => 'Destination refused by url_validator',
+                    'action' => $command,
+                    'type' => 'transport',
+                    'http' => 0,
+                ];
+                $this->_debug('REFUSED', $command . ' ' . $this->_redact($url));
 
-        // file_get_contents fills this in, but only once it has an http response to report
-        $http_response_header = [];
+                return null;
+            }
 
-        // warnings are suppressed deliberately: they quote the url, auth token and all
-        $data   = @file_get_contents($url, false, $context);
-        $status = $this->_response_status($http_response_header);
+            // a validator is only useful if every hop is checked, so this leaves PHP's own redirect following
+            // in place when there is none, and takes over one hop at a time when there is
+            $response = $this->_request_once($url, $this->url_validator === null);
 
-        if ($data === false || $data === '') {
-            $this->last_error = [
-                'code' => 0,
-                'message' => ($status > 0)
-                    ? 'Server answered HTTP ' . $status . ' with no body'
-                    : 'No response from server',
-                'action' => $command,
-                'type' => 'transport',
-                'http' => $status,
-            ];
-            $this->_debug('NO RESPONSE', $command . ' (http ' . $status . ')');
+            if ($this->url_validator !== null && $response['location'] !== null) {
+                $this->_debug('REDIRECT', $command . ' -> ' . $this->_redact($response['location']));
+                $url = $response['location'];
+                continue;
+            }
 
-            return null;
+            $data   = $response['data'];
+            $status = $response['status'];
+
+            if ($data === false || $data === '') {
+                $this->last_error = [
+                    'code' => 0,
+                    'message' => ($status > 0)
+                        ? 'Server answered HTTP ' . $status . ' with no body'
+                        : 'No response from server',
+                    'action' => $command,
+                    'type' => 'transport',
+                    'http' => $status,
+                ];
+                $this->_debug('NO RESPONSE', $command . ' (http ' . $status . ')');
+
+                return null;
+            }
+
+            $result = null;
+            switch ($this->api_format) {
+                case 'json':
+                    $result = json_decode($data, true);
+                    break;
+                case 'xml':
+                    $result = simplexml_load_string($data);
+            }
+
+            // Only a decode failure counts as no answer, and an empty api8 result is falsy, so this cannot be a truthiness test
+            if ($result === null || $result === false) {
+                $this->last_error = [
+                    'code' => 0,
+                    'message' => 'Unreadable ' . $this->api_format . ' response',
+                    'action' => $command,
+                    'type' => 'transport',
+                    'http' => $status,
+                ];
+                $this->_debug('EMPTY RESPONSE', $command);
+
+                return null;
+            }
+
+            // An api error is handed back decoded, as api3 to api6 always have, and last_error() carries the message for anyone who wants it
+            $this->last_error = $this->_parse_error($result, $command, $status);
+            if ($this->last_error !== null) {
+                $this->_debug('API ERROR', $command . ' ' . $this->last_error['code'] . ' ' . $this->last_error['message']);
+            }
+
+            return $result;
         }
 
-        $result = null;
-        switch ($this->api_format) {
-            case 'json':
-                $result = json_decode($data, true);
-                break;
-            case 'xml':
-                $result = simplexml_load_string($data);
-        }
+        $this->last_error = [
+            'code' => 0,
+            'message' => 'Too many redirects',
+            'action' => $command,
+            'type' => 'transport',
+            'http' => 0,
+        ];
+        $this->_debug('TOO MANY REDIRECTS', $command);
 
-        // Only a decode failure counts as no answer, and an empty api8 result is falsy, so this cannot be a truthiness test
-        if ($result === null || $result === false) {
-            $this->last_error = [
-                'code' => 0,
-                'message' => 'Unreadable ' . $this->api_format . ' response',
-                'action' => $command,
-                'type' => 'transport',
-                'http' => $status,
-            ];
-            $this->_debug('EMPTY RESPONSE', $command);
-
-            return null;
-        }
-
-        // An api error is handed back decoded, as api3 to api6 always have, and last_error() carries the message for anyone who wants it
-        $this->last_error = $this->_parse_error($result, $command, $status);
-        if ($this->last_error !== null) {
-            $this->_debug('API ERROR', $command . ' ' . $this->last_error['code'] . ' ' . $this->last_error['message']);
-        }
-
-        return $result;
+        return null;
     }
 
     /**
@@ -759,6 +797,78 @@ class AmpacheApi
 
         // the same values inside the json blob we log for send_command options
         return (string) preg_replace('/("(?:auth|passphrase)"\s*:\s*)"[^"]*"/i', '${1}"***"', $message);
+    }
+
+    /**
+     * _redirect_location
+     *
+     * The absolute url a redirect response points at, or null when the response is not a redirect
+     * @param string[] $headers
+     */
+    private function _redirect_location(array $headers, int $status, string $requestedUrl): ?string
+    {
+        if ($status < 300 || $status > 399) {
+            return null;
+        }
+
+        $location = null;
+        foreach ($headers as $header) {
+            if (preg_match('/^Location:\s*(.+)$/i', $header, $matches) === 1) {
+                $location = trim($matches[1]);
+            }
+        }
+
+        if ($location === null || $location === '') {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $location) === 1) {
+            return $location;
+        }
+
+        // a relative Location is resolved against the url that answered with it
+        $base = parse_url($requestedUrl);
+
+        return sprintf(
+            '%s://%s%s%s',
+            $base['scheme'] ?? 'http',
+            $base['host'] ?? '',
+            isset($base['port']) ? ':' . $base['port'] : '',
+            (preg_match('#^/#', $location) === 1) ? $location : '/' . $location
+        );
+    }
+
+    /**
+     * _request_once
+     *
+     * Makes a single request, without following a redirect when $followLocation is false; the caller loops for that.
+     * @return array{data: string|false, status: int, location: string|null}
+     */
+    private function _request_once(string $url, bool $followLocation): array
+    {
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => ($this->api_timeout > 0)
+                    ? $this->api_timeout
+                    : (int) ini_get('default_socket_timeout'),
+                // api8 answers errors with a real http status, so without this the error body is discarded and we see only a failed read
+                'ignore_errors' => true,
+                'follow_location' => $followLocation ? 1 : 0,
+            ],
+        ]);
+
+        // file_get_contents fills this in, but only once it has an http response to report
+        $http_response_header = [];
+
+        // warnings are suppressed deliberately: they quote the url, auth token and all
+        $data   = @file_get_contents($url, false, $context);
+        $status = $this->_response_status($http_response_header);
+
+        return [
+            'data' => $data,
+            'status' => $status,
+            'location' => $this->_redirect_location($http_response_header, $status, $url),
+        ];
     }
 
     /**
