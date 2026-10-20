@@ -123,7 +123,11 @@ class AmpacheApiTransportTest extends TestCase
         $logged = implode("\n", self::$log);
         self::assertStringNotContainsString('SESSIONTOKEN', $logged);
         self::assertStringNotContainsString(hash('sha256', 'secret'), $logged);
-        self::assertStringContainsString('auth=***', $logged);
+
+        // the handshake's own auth=*** is the login passphrase, not the session token; this checks the later, authenticated command instead
+        $artistsUrlLine = self::$log[array_key_last(self::$log)];
+        self::assertStringContainsString('action=artists', $artistsUrlLine);
+        self::assertStringNotContainsString('auth=', $artistsUrlLine, 'the session token travels in a header now, so this url has nothing to redact');
     }
 
     /**
@@ -160,6 +164,14 @@ class AmpacheApiTransportTest extends TestCase
         self::assertSame(4704, $error['code']);
         self::assertSame('Not Found', $error['message']);
         self::assertSame(200, $error['http']);
+    }
+
+    public function testGetCommandUrlStillEmbedsAuthForExternalUse(): void
+    {
+        $url = $this->connected()->get_command_url('download', ['id' => 1]);
+
+        self::assertStringContainsString('&auth=SESSIONTOKEN', $url);
+        self::assertStringContainsString('&username=tester', $url);
     }
 
     public function testHandshakeConnects(): void
@@ -212,6 +224,15 @@ class AmpacheApiTransportTest extends TestCase
         self::assertNotNull($error);
         self::assertSame(405, $error['code']);
         self::assertSame('Invalid Request', $error['message']);
+    }
+
+    public function testSendCommandSendsAuthViaHeaderNotUrl(): void
+    {
+        $result = $this->connected()->send_command('genres');
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+        self::assertSame('SESSIONTOKEN', (string) $result->http_auth, 'the session token should arrive as the auth header');
+        self::assertSame('', (string) $result->query_auth, 'the session token should not appear in the url');
     }
 
     public function testSuccessfulCommandReportsNoError(): void

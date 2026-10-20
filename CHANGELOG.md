@@ -1,5 +1,18 @@
 # Changelog
 
+## AmpacheApi 2.2.0
+
+### Added (2.2.0)
+
+* API8 methods
+  * `playlist_folder`, `playlist_folders`, `playlist_folder_add`, `playlist_folder_create`, `playlist_folder_delete`, `playlist_folder_edit`, `playlist_folder_items` and `playlist_folder_remove`
+  * `quickconnect_initiate` and `quickconnect_status`
+  * `upload`
+
+### Changed (2.2.0)
+
+* `send_command()` sends the session token in an `auth` header instead of the url query string; `get_command_url()` is unchanged, since `stream`/`download` urls still need it there
+
 ## AmpacheApi 2.1.0
 
 ### Added (2.1.0)

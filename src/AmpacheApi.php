@@ -51,7 +51,7 @@ class AmpacheApi
         6 => '6.9.1',
         8 => '8.0.0',
     ];
-    private const LIB_VERSION = '2.1.0';
+    private const LIB_VERSION = '2.2.0';
 
     /** How many redirects a command will follow when a url_validator is configured, each one checked before it is followed */
     private const MAX_REDIRECTS = 10;
@@ -147,6 +147,14 @@ class AmpacheApi
         'playlist_create' => 3,
         'playlist_delete' => 3,
         'playlist_edit' => 4,
+        'playlist_folder' => 8,
+        'playlist_folder_add' => 8,
+        'playlist_folder_create' => 8,
+        'playlist_folder_delete' => 8,
+        'playlist_folder_edit' => 8,
+        'playlist_folder_items' => 8,
+        'playlist_folder_remove' => 8,
+        'playlist_folders' => 8,
         'playlist_generate' => 4,
         'playlist_hash' => 6,
         'playlist_remove' => 8,
@@ -165,6 +173,8 @@ class AmpacheApi
         'preference_create' => 5,
         'preference_delete' => 5,
         'preference_edit' => 5,
+        'quickconnect_initiate' => 8,
+        'quickconnect_status' => 8,
         'random' => 8,
         'rate' => 3,
         'record_play' => 4,
@@ -204,6 +214,7 @@ class AmpacheApi
         'update_artist_info' => 4,
         'update_from_tags' => 4,
         'update_podcast' => 4,
+        'upload' => 8,
         'url_to_song' => 3,
         'user' => 3,
         'user_create' => 4,
@@ -469,11 +480,13 @@ class AmpacheApi
      * get_command_url
      *
      * This builds and returns the command URL for the specified command and
-     * options.
+     * options. $include_auth is false only for send_command()'s own request, which
+     * carries the token in a header instead; a url handed to something else (a
+     * player, a download link) has no header to use, so it keeps carrying auth.
      * @param array<string, mixed> $options
      * @throws Exception
      */
-    public function get_command_url(string $command, ?array $options = []): string
+    public function get_command_url(string $command, ?array $options = [], bool $include_auth = true): string
     {
         if ($this->state() != 'READY' && $this->state() != 'CONNECTED') {
             throw new Exception('AmpacheApi::get_command_url API in non-ready state, unable to build a url');
@@ -518,7 +531,7 @@ class AmpacheApi
         }
 
         // If auth is set then we append it so callers don't have to.
-        if ($this->api_auth) {
+        if ($this->api_auth && $include_auth) {
             $url .= '&auth=' . urlencode($this->api_auth) . '&username=' . urlencode($this->username);
         }
 
@@ -578,7 +591,8 @@ class AmpacheApi
             throw new Exception('AmpacheApi::send_command Invalid/Unknown command ' . $command . ' issued');
         }
 
-        $url = $this->get_command_url($command, $options);
+        // the request fired below carries auth in a header instead of the url; see get_command_url()
+        $url = $this->get_command_url($command, $options, false);
 
         $this->_debug('COMMAND URL', $url);
 
@@ -846,21 +860,26 @@ class AmpacheApi
      */
     private function _request_once(string $url, bool $followLocation): array
     {
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => ($this->api_timeout > 0)
-                    ? $this->api_timeout
-                    : (int) ini_get('default_socket_timeout'),
-                // api8 answers errors with a real http status, so without this the error body is discarded and we see only a failed read
-                'ignore_errors' => true,
-                'follow_location' => $followLocation ? 1 : 0,
-            ],
-        ]);
+        $http = [
+            'timeout' => ($this->api_timeout > 0)
+                ? $this->api_timeout
+                : (int) ini_get('default_socket_timeout'),
+            // api8 answers errors with a real http status, so without this the error body is discarded and we see only a failed read
+            'ignore_errors' => true,
+            'follow_location' => $followLocation ? 1 : 0,
+        ];
+
+        // Ampache's Gatekeeper has read a bare auth header since 2020, well before this library's supported floor.
+        if ($this->api_auth) {
+            $http['header'] = 'auth: ' . $this->api_auth . "\r\n";
+        }
+
+        $context = stream_context_create(['http' => $http]);
 
         // file_get_contents fills this in, but only once it has an http response to report
         $http_response_header = [];
 
-        // warnings are suppressed deliberately: they quote the url, auth token and all
+        // warnings are suppressed deliberately: they can still quote the url
         $data   = @file_get_contents($url, false, $context);
         $status = $this->_response_status($http_response_header);
 

@@ -122,6 +122,20 @@ switch ($action) {
         header('Content-Type: text/xml');
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<artist id=\"1\">\n\t\t<name>Tester</name>\n\t</artist>\n</root>\n";
         break;
+    case 'genres':
+        // reports what carried the session token, so a test can tell a header apart from the query string
+        $httpAuth  = $_SERVER['HTTP_AUTH'] ?? '';
+        $queryAuth = $_GET['auth'] ?? '';
+        if ($json) {
+            header('Content-Type: application/json');
+            echo json_encode(['http_auth' => $httpAuth, 'query_auth' => $queryAuth]);
+
+            break;
+        }
+
+        header('Content-Type: text/xml');
+        echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<http_auth><![CDATA[$httpAuth]]></http_auth>\n\t<query_auth><![CDATA[$queryAuth]]></query_auth>\n</root>\n";
+        break;
     default:
         if ($json) {
             header('Content-Type: application/json');
