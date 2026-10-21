@@ -12,6 +12,7 @@
 ### Changed (2.2.0)
 
 * `send_command()` sends the session token in an `auth` header instead of the url query string; `get_command_url()` is unchanged, since `stream`/`download` urls still need it there
+* Add `ext-simplexml` to `composer.json`
 
 ## AmpacheApi 2.1.0
 
