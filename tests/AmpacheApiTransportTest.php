@@ -112,6 +112,19 @@ class AmpacheApiTransportTest extends TestCase
         self::assertSame($http, $error['http']);
     }
 
+    public function testBadCredentialsLeaveStateErrorWithTheServersOwnError(): void
+    {
+        $api = $this->connected(['username' => 'baduser']);
+
+        self::assertSame('ERROR', $api->state());
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame(4701, $error['code']);
+        self::assertSame('Invalid Handshake', $error['message']);
+        self::assertNotSame('transport', $error['type'], 'this is the server refusing, not a transport failure');
+    }
+
     public function testDebugCallbackNeverSeesTheSessionTokenOrPassphrase(): void
     {
         self::$log = [];
@@ -128,6 +141,18 @@ class AmpacheApiTransportTest extends TestCase
         $artistsUrlLine = self::$log[array_key_last(self::$log)];
         self::assertStringContainsString('action=artists', $artistsUrlLine);
         self::assertStringNotContainsString('auth=', $artistsUrlLine, 'the session token travels in a header now, so this url has nothing to redact');
+    }
+
+    public function testDebugOutputIsRedactedTooNotJustTheCallback(): void
+    {
+        ob_start();
+        $api = $this->connected(['debug' => true]);
+        $api->send_command('artists');
+        $output = (string) ob_get_clean();
+
+        self::assertNotEmpty($output);
+        self::assertStringNotContainsString(hash('sha256', 'secret'), $output);
+        self::assertStringContainsString('auth=***', $output, 'the login passphrase in the handshake url should still be redacted');
     }
 
     /**
@@ -164,6 +189,16 @@ class AmpacheApiTransportTest extends TestCase
         self::assertSame(4704, $error['code']);
         self::assertSame('Not Found', $error['message']);
         self::assertSame(200, $error['http']);
+    }
+
+    public function testExactlyMaxRedirectsStillSucceeds(): void
+    {
+        $api    = $this->connected(['url_validator' => static fn(): bool => true]);
+        $result = $api->send_command('artists', ['redirect_count' => 10]);
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+        self::assertSame('Tester', (string) $result->artist->name);
+        self::assertNull($api->last_error());
     }
 
     public function testGetCommandUrlStillEmbedsAuthForExternalUse(): void
@@ -214,6 +249,19 @@ class AmpacheApiTransportTest extends TestCase
         self::assertNull($api->last_error());
     }
 
+    public function testMalformedResponseBodyIsATransportError(): void
+    {
+        $api    = $this->connected();
+        $result = $api->send_command('artists', ['malformed' => 1]);
+
+        self::assertNull($result, 'a body that cannot be decoded at all must not be handed back as a result');
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame('transport', $error['type']);
+        self::assertStringContainsString('Unreadable xml response', $error['message']);
+    }
+
     public function testOlderErrorShapeIsUnderstood(): void
     {
         $api = $this->connected(['server_version' => 4]);
@@ -226,6 +274,68 @@ class AmpacheApiTransportTest extends TestCase
         self::assertSame('Invalid Request', $error['message']);
     }
 
+    public function testOlderJsonErrorShapeIsUnderstood(): void
+    {
+        $api = $this->connected(['api_format' => 'json', 'server_version' => 4]);
+        $api->send_command('video');
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame(405, $error['code']);
+        self::assertSame('Invalid Request', $error['message']);
+    }
+
+    public function testOneMoreThanMaxRedirectsFails(): void
+    {
+        $api    = $this->connected(['url_validator' => static fn(): bool => true]);
+        $result = $api->send_command('artists', ['redirect_count' => 11]);
+
+        self::assertNull($result);
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame('transport', $error['type']);
+        self::assertSame('Too many redirects', $error['message']);
+    }
+
+    public function testRedirectIsFollowedNativelyWithoutAUrlValidator(): void
+    {
+        $host   = self::$server->host();
+        $api    = $this->connected();
+        $result = $api->send_command('artists', ['redirect_to' => 'http://' . $host . '/?action=artists']);
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+        self::assertSame('Tester', (string) $result->artist->name);
+        self::assertNull($api->last_error());
+    }
+
+    public function testRelativeRedirectWithoutALeadingSlashIsResolvedAgainstTheRequestHost(): void
+    {
+        $api    = $this->connected(['url_validator' => static fn(): bool => true]);
+        $result = $api->send_command('artists', ['redirect_to' => 'elsewhere?action=artists']);
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+        self::assertSame('Tester', (string) $result->artist->name);
+        self::assertNull($api->last_error());
+    }
+
+    /**
+     * file_get_contents concatenates one status line per hop it follows natively, so this proves the last one
+     * wins rather than the 302 that got the client there.
+     */
+    public function testResponseStatusReflectsTheFinalHopOfANativeRedirectNotTheRedirectItself(): void
+    {
+        $host   = self::$server->host();
+        $api    = $this->connected();
+        $result = $api->send_command('catalogs', ['redirect_to' => 'http://' . $host . '/?action=catalogs']);
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+
+        $error = $api->last_error();
+        self::assertNotNull($error);
+        self::assertSame(400, $error['http']);
+    }
+
     public function testSendCommandSendsAuthViaHeaderNotUrl(): void
     {
         $result = $this->connected()->send_command('genres');
@@ -233,6 +343,16 @@ class AmpacheApiTransportTest extends TestCase
         self::assertInstanceOf(SimpleXMLElement::class, $result);
         self::assertSame('SESSIONTOKEN', (string) $result->http_auth, 'the session token should arrive as the auth header');
         self::assertSame('', (string) $result->query_auth, 'the session token should not appear in the url');
+    }
+
+    public function testSongTagsEmptyResultSupportsCatalogRemotesFeatureDetection(): void
+    {
+        $api    = $this->connected();
+        $result = $api->send_command('song_tags', ['filter' => 1]);
+
+        self::assertInstanceOf(SimpleXMLElement::class, $result);
+        self::assertNull($api->last_error());
+        self::assertCount(0, $result->children());
     }
 
     public function testSuccessfulCommandReportsNoError(): void

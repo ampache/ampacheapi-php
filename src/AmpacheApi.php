@@ -644,7 +644,7 @@ class AmpacheApi
                     $result = json_decode($data, true);
                     break;
                 case 'xml':
-                    $result = simplexml_load_string($data);
+                    $result = @simplexml_load_string($data);
             }
 
             // Only a decode failure counts as no answer, and an empty api8 result is falsy, so this cannot be a truthiness test

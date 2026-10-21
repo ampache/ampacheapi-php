@@ -48,6 +48,33 @@ if (isset($_GET['redirect_to'])) {
     exit;
 }
 
+// redirects exactly redirect_count times before answering normally, so a test can land on the
+// MAX_REDIRECTS boundary precisely instead of only proving an unbounded chain fails
+if (isset($_GET['redirect_count']) && (int) $_GET['redirect_count'] > 0) {
+    $query                     = $_GET;
+    $query['redirect_count']   = (int) $_GET['redirect_count'] - 1;
+    http_response_code(302);
+    header('Location: /?' . http_build_query($query));
+
+    exit;
+}
+
+// answers any command with deliberately unparsable output, so a test can drive the decode-failure path
+if (isset($_GET['malformed'])) {
+    http_response_code(200);
+    if ($json) {
+        header('Content-Type: application/json');
+        echo '{not valid json';
+
+        exit;
+    }
+
+    header('Content-Type: text/xml');
+    echo 'not valid xml<<<';
+
+    exit;
+}
+
 /**
  * Writes an error in the api5+ shape, under the http status api8 would use.
  */
@@ -64,16 +91,33 @@ $error = static function (int $http, int $code, string $message, string $type) u
     echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<error errorCode=\"$code\">\n\t\t<errorAction><![CDATA[$action]]></errorAction>\n\t\t<errorType><![CDATA[$type]]></errorType>\n\t\t<errorMessage><![CDATA[$message]]></errorMessage>\n\t</error>\n</root>\n";
 };
 
+// answers any command with a caller-chosen error code, so a probe-style caller can be tested against every code it classifies on
+if (isset($_GET['respond_error_code'])) {
+    $error((int) ($_GET['respond_error_http'] ?? 200), (int) $_GET['respond_error_code'], 'Probed error', 'system');
+
+    exit;
+}
+
 if ($action === 'handshake') {
+    // proves a client sees the server's own rejection, not just a url_validator refusal, when credentials are wrong
+    if (($_GET['user'] ?? '') === 'baduser') {
+        $error(401, 4701, 'Invalid Handshake', 'account');
+
+        exit;
+    }
+
+    // echoes back the version the client asked for, so a test can simulate a server rolling the request up to a later one
+    $reportedApi = (string) ($_GET['version'] ?? '6.9.1');
+
     if ($json) {
         header('Content-Type: application/json');
-        echo json_encode(['auth' => 'SESSIONTOKEN', 'api' => '6.9.1', 'songs' => 5, 'artists' => 2]);
+        echo json_encode(['auth' => 'SESSIONTOKEN', 'api' => $reportedApi, 'songs' => 5, 'artists' => 2]);
 
         exit;
     }
 
     header('Content-Type: text/xml');
-    echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<auth>SESSIONTOKEN</auth>\n\t<api>6.9.1</api>\n\t<songs>5</songs>\n\t<artists>2</artists>\n</root>\n";
+    echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<auth>SESSIONTOKEN</auth>\n\t<api>$reportedApi</api>\n\t<songs>5</songs>\n\t<artists>2</artists>\n</root>\n";
 
     exit;
 }
@@ -101,9 +145,28 @@ switch ($action) {
         $error(500, 4702, 'Generic Error', 'system');
         break;
     case 'video':
-        // the api3 and api4 shape, where the message is the element body
+        // the api3 and api4 shape, where the message is the element body (json: a bare code/message pair)
+        if ($json) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => ['code' => '405', 'message' => 'Invalid Request']]);
+
+            break;
+        }
+
         header('Content-Type: text/xml');
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n\t<error code=\"405\"><![CDATA[Invalid Request]]></error>\n</root>\n";
+        break;
+    case 'song_tags':
+        // Catalog_remote feature-detects this: an empty result means the server predates song_tags, so it falls back per-song
+        if ($json) {
+            header('Content-Type: application/json');
+            echo json_encode([]);
+
+            break;
+        }
+
+        header('Content-Type: text/xml');
+        echo "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<root>\n</root>\n";
         break;
     case 'songs':
         // api8 answers an empty result with a 404, and in json that body is a falsy []

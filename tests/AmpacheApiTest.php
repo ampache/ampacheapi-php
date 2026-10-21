@@ -61,6 +61,20 @@ class AmpacheApiTest extends TestCase
         ];
     }
 
+    public function testApiFormatIsIgnoredWhenNeitherXmlNorJson(): void
+    {
+        $api = $this->configured(['api_format' => 'yaml']);
+
+        self::assertStringStartsWith('https://music.example/server/xml.server.php', $api->get_command_url('ping'));
+    }
+
+    public function testApiSecureFalseOverridesAnHttpsSchemeToHttp(): void
+    {
+        $api = $this->configured(['server' => 'https://music.example', 'api_secure' => false]);
+
+        self::assertStringStartsWith('http://music.example/server/', $api->get_command_url('ping'));
+    }
+
     public function testBooleanOptionsBecomeTheZeroOrOneAmpacheExpects(): void
     {
         $url = $this->configured()->get_command_url('songs', ['exact' => true, 'unique' => false]);
@@ -112,6 +126,22 @@ class AmpacheApiTest extends TestCase
         self::assertSame(6, $this->readProperty($this->configured(), 'server_version'));
     }
 
+    public function testEmptyOptionKeyIsSkippedRatherThanSentEmpty(): void
+    {
+        $raised = [];
+        set_error_handler(static function (int $number, string $message) use (&$raised): bool {
+            $raised[] = $message;
+
+            return true;
+        });
+        $url = $this->configured()->get_command_url('songs', [' ' => 'orphan', 'limit' => 5]);
+        restore_error_handler();
+
+        self::assertStringContainsString('&limit=5', $url);
+        self::assertStringNotContainsString('orphan', $url);
+        self::assertNotEmpty(array_filter($raised, static fn(string $m): bool => strpos($m, 'unable to append empty variable') !== false));
+    }
+
     /**
      * PingMethod rewrites the session to Api::$version when a ping arrives without one, so every command carries its version.
      */
@@ -135,6 +165,11 @@ class AmpacheApiTest extends TestCase
         self::assertNull($this->configured()->last_error());
     }
 
+    public function testNegativeTimeoutIsClampedToZero(): void
+    {
+        self::assertSame(0, $this->readProperty($this->configured(['timeout' => -5]), 'api_timeout'));
+    }
+
     public function testNonCallableDebugCallbackIsReportedRatherThanStored(): void
     {
         $raised = [];
@@ -147,6 +182,23 @@ class AmpacheApiTest extends TestCase
         // the config is left incomplete so the constructor stops before it tries to connect
         // @phpstan-ignore-next-line
         new AmpacheApi(['username' => 'tester', 'password' => 'secret', 'debug_callback' => 'definitely_not_a_function']);
+        restore_error_handler();
+
+        self::assertNotEmpty(array_filter($raised, static fn(string $m): bool => strpos($m, 'not callable') !== false));
+    }
+
+    public function testNonCallableUrlValidatorIsReportedRatherThanStored(): void
+    {
+        $raised = [];
+        set_error_handler(static function (int $number, string $message) use (&$raised): bool {
+            $raised[] = $message;
+
+            return true;
+        });
+
+        // the config is left incomplete so the constructor stops before it tries to connect
+        // @phpstan-ignore-next-line
+        new AmpacheApi(['username' => 'tester', 'password' => 'secret', 'url_validator' => 'definitely_not_a_function']);
         restore_error_handler();
 
         self::assertNotEmpty(array_filter($raised, static fn(string $m): bool => strpos($m, 'not callable') !== false));
@@ -168,11 +220,53 @@ class AmpacheApiTest extends TestCase
         self::assertStringNotContainsString('offset', $url);
     }
 
+    public function testNullOptionsParameterIsAcceptedOutright(): void
+    {
+        $url = $this->configured()->get_command_url('ping', null);
+
+        self::assertStringContainsString('action=ping', $url);
+    }
+
     public function testOptionsAreUrlEncoded(): void
     {
         $url = $this->configured()->get_command_url('advanced_search', ['rule_1_input' => 'a b&c']);
 
         self::assertStringContainsString('&rule_1_input=a+b%26c', $url);
+    }
+
+    public function testReconfiguringAnAlreadyConnectedInstanceDropsItBackToReady(): void
+    {
+        $api = $this->configured();
+        $api->set_state('CONNECTED');
+
+        $api->configure(['username' => 'tester', 'password' => 'secret', 'server' => 'music.example']);
+
+        self::assertSame('READY', $api->state(), 'configure() only ever advances to READY, so a prior CONNECTED must not survive it');
+    }
+
+    /**
+     * _redact only ever sees auth= produced by this library's own requests in practice; this drives every
+     * param name and shape the regexes claim to cover, including ones no current code path emits.
+     */
+    public function testRedactMasksEveryKnownCredentialParamAndJsonField(): void
+    {
+        $method = (new ReflectionClass(AmpacheApi::class))->getMethod('_redact');
+        if (PHP_VERSION_ID < 80100) {
+            $method->setAccessible(true);
+        }
+        $api = (new ReflectionClass(AmpacheApi::class))->newInstanceWithoutConstructor();
+
+        $redacted = $method->invoke($api, 'https://host/x?ssid=abc123&api_key=def456&auth=ghi789&passphrase=jkl000&foo=bar');
+        self::assertStringNotContainsString('abc123', $redacted);
+        self::assertStringNotContainsString('def456', $redacted);
+        self::assertStringNotContainsString('ghi789', $redacted);
+        self::assertStringNotContainsString('jkl000', $redacted);
+        self::assertStringContainsString('foo=bar', $redacted);
+
+        $redactedJson = $method->invoke($api, '{"auth":"secret1","passphrase":"secret2","other":"keep"}');
+        self::assertStringNotContainsString('secret1', $redactedJson);
+        self::assertStringNotContainsString('secret2', $redactedJson);
+        self::assertStringContainsString('"other":"keep"', $redactedJson);
     }
 
     public function testSchemeInTheServerAddressDecidesWhenApiSecureIsNotAsked(): void
@@ -192,6 +286,15 @@ class AmpacheApiTest extends TestCase
     public function testSchemelessAddressStaysOnHttps(): void
     {
         self::assertStringStartsWith('https://music.example/server/', $this->configured()->get_command_url('ping'));
+    }
+
+    public function testSetStateUppercasesWhateverItIsGiven(): void
+    {
+        $api = (new ReflectionClass(AmpacheApi::class))->newInstanceWithoutConstructor();
+
+        $api->set_state('ready');
+
+        self::assertSame('READY', $api->state());
     }
 
     public function testStartsUnconfiguredAndBecomesReady(): void
